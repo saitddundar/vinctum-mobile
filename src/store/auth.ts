@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import { api } from "../api/client";
+import { getDeviceName, getDeviceType, getOrCreateFingerprint, getStoredDeviceId, storeDeviceId } from "../lib/device";
 
 interface User {
   user_id: string;
@@ -37,6 +38,21 @@ export const useAuthStore = create<AuthState>((set) => ({
       user: data.user,
       isAuthenticated: true,
     });
+
+    // auto-register this device if not already registered
+    const existingDeviceId = await getStoredDeviceId();
+    if (!existingDeviceId) {
+      try {
+        const fingerprint = await getOrCreateFingerprint();
+        const res = await api.post("/api/v1/devices", {
+          name: getDeviceName(),
+          device_type: getDeviceType(),
+          fingerprint,
+          node_id: fingerprint.slice(0, 16),
+        });
+        await storeDeviceId(res.data.device.device_id);
+      } catch {}
+    }
   },
 
   logout: async () => {
