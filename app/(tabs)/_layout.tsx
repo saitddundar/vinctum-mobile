@@ -7,6 +7,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="devices" options={{ title: "Cihazlar" }} />
       <Tabs.Screen name="pairing" options={{ title: "Eşleştir" }} />
       <Tabs.Screen name="transfers" options={{ title: "Transfer" }} />
+      <Tabs.Screen name="sessions" options={{ title: "Oturumlar" }} />
     </Tabs>
   );
 }
