@@ -2,6 +2,7 @@ import { create } from "zustand";
 import * as SecureStore from "expo-secure-store";
 import { api } from "../api/client";
 import { getDeviceName, getDeviceType, getOrCreateFingerprint, getStoredDeviceId, storeDeviceId } from "../lib/device";
+import { ensureKeyUploaded } from "../lib/keyManager";
 
 interface User {
   user_id: string;
@@ -53,6 +54,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         await storeDeviceId(res.data.device.device_id);
       } catch {}
     }
+
+    ensureKeyUploaded().catch(() => {});
   },
 
   logout: async () => {
