@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { View } from "react-native";
 import { Slot, useRouter, useSegments } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuthStore } from "../src/store/auth";
+import { colors } from "../src/lib/theme";
 
 const queryClient = new QueryClient();
 
@@ -27,7 +30,9 @@ function AuthGate() {
     }
   }, [ready, isAuthenticated, segments]);
 
-  if (!ready) return null;
+  if (!ready) {
+    return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+  }
 
   return <Slot />;
 }
@@ -35,6 +40,7 @@ function AuthGate() {
 export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
+      <StatusBar style="light" />
       <AuthGate />
     </QueryClientProvider>
   );

@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, FlatList, Pressable, StyleSheet, TextInput, Alert } from "react-native";
 import { useNodeTransfers } from "../../src/features/transfer/hooks/useTransfers";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
 import { useDownload } from "../../src/features/transfer/hooks/useDownload";
 import { Transfer, TransferStatus } from "../../src/features/transfer/types";
 import { getStoredDeviceId } from "../../src/lib/device";
-import { useEffect } from "react";
+import { colors, spacing, radius } from "../../src/lib/theme";
 
 const statusLabel: Record<string, string> = {
   [TransferStatus.PENDING]: "Bekliyor",
@@ -16,17 +16,18 @@ const statusLabel: Record<string, string> = {
 };
 
 const statusColor: Record<string, string> = {
-  [TransferStatus.PENDING]: "#f39c12",
-  [TransferStatus.IN_PROGRESS]: "#3498db",
-  [TransferStatus.COMPLETED]: "#27ae60",
-  [TransferStatus.CANCELLED]: "#95a5a6",
-  [TransferStatus.FAILED]: "#e74c3c",
+  [TransferStatus.PENDING]: colors.warning,
+  [TransferStatus.IN_PROGRESS]: colors.accent,
+  [TransferStatus.COMPLETED]: colors.success,
+  [TransferStatus.CANCELLED]: colors.textMuted,
+  [TransferStatus.FAILED]: colors.error,
 };
 
 export default function TransfersScreen() {
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [receiverNodeId, setReceiverNodeId] = useState("");
   const [receiverPubKey, setReceiverPubKey] = useState("");
+  const [inputFocused, setInputFocused] = useState<string | null>(null);
   const { data: transfers, isLoading } = useNodeTransfers(nodeId || "");
   const uploadHook = useUpload();
   const downloadHook = useDownload();
@@ -62,18 +63,24 @@ export default function TransfersScreen() {
       <View style={styles.sendSection}>
         <Text style={styles.sectionTitle}>Dosya Gönder</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputFocused === "node" && styles.inputFocused]}
           placeholder="Alıcı Node ID"
+          placeholderTextColor={colors.textMuted}
           value={receiverNodeId}
           onChangeText={setReceiverNodeId}
           autoCapitalize="none"
+          onFocus={() => setInputFocused("node")}
+          onBlur={() => setInputFocused(null)}
         />
         <TextInput
-          style={styles.input}
+          style={[styles.input, inputFocused === "key" && styles.inputFocused]}
           placeholder="Alıcı Public Key (base64)"
+          placeholderTextColor={colors.textMuted}
           value={receiverPubKey}
           onChangeText={setReceiverPubKey}
           autoCapitalize="none"
+          onFocus={() => setInputFocused("key")}
+          onBlur={() => setInputFocused(null)}
         />
         <Pressable
           style={[styles.button, uploadHook.uploading && styles.disabled]}
@@ -100,6 +107,12 @@ export default function TransfersScreen() {
                 {statusLabel[item.status] || item.status}
               </Text>
             </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, {
+                width: `${item.progress_percent}%`,
+                backgroundColor: statusColor[item.status] || colors.accent,
+              }]} />
+            </View>
             <Text style={styles.meta}>
               {(item.total_size_bytes / 1024).toFixed(0)} KB • {item.progress_percent}%
             </Text>
@@ -110,34 +123,67 @@ export default function TransfersScreen() {
             )}
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>{isLoading ? "Yükleniyor..." : "Transfer yok"}</Text>}
+        ListEmptyComponent={
+          <Text style={styles.empty}>{isLoading ? "Yükleniyor..." : "Transfer yok"}</Text>
+        }
+        contentContainerStyle={{ paddingBottom: 100 }}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5", padding: 16 },
-  sendSection: { backgroundColor: "#fff", borderRadius: 10, padding: 16, marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: "600", marginBottom: 12 },
+  container: { flex: 1, padding: spacing.md },
+  sendSection: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: "600", color: colors.text, marginBottom: spacing.sm },
   input: {
-    borderWidth: 1, borderColor: "#ddd", borderRadius: 8,
-    padding: 12, fontSize: 14, marginBottom: 8, backgroundColor: "#fafafa",
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.inputBorder,
+    borderRadius: radius.md,
+    padding: 14,
+    fontSize: 14,
+    marginBottom: 8,
+    color: colors.text,
   },
+  inputFocused: { borderColor: colors.inputBorderFocus },
   button: {
-    backgroundColor: "#2c3e50", padding: 14, borderRadius: 8, alignItems: "center", marginTop: 4,
+    backgroundColor: colors.accent,
+    padding: 14,
+    borderRadius: radius.md,
+    alignItems: "center",
+    marginTop: 4,
   },
-  disabled: { opacity: 0.6 },
+  disabled: { opacity: 0.5 },
   buttonText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   card: {
-    backgroundColor: "#fff", borderRadius: 10, padding: 14,
-    marginBottom: 10, shadowColor: "#000", shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: 14,
+    marginBottom: 10,
   },
-  cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
-  filename: { fontSize: 15, fontWeight: "500", flex: 1, marginRight: 8 },
+  cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  filename: { fontSize: 15, fontWeight: "500", flex: 1, marginRight: 8, color: colors.text },
   status: { fontSize: 13, fontWeight: "600" },
-  meta: { fontSize: 12, color: "#888" },
+  progressTrack: {
+    height: 3,
+    backgroundColor: colors.inputBg,
+    borderRadius: 2,
+    marginBottom: 6,
+    overflow: "hidden",
+  },
+  progressFill: { height: "100%", borderRadius: 2 },
+  meta: { fontSize: 12, color: colors.textSecondary },
   downloadBtn: { marginTop: 8, alignSelf: "flex-end" },
-  downloadText: { color: "#2c3e50", fontWeight: "600", fontSize: 14 },
-  empty: { textAlign: "center", color: "#999", marginTop: 40 },
+  downloadText: { color: colors.accent, fontWeight: "600", fontSize: 14 },
+  empty: { textAlign: "center", color: colors.textMuted, marginTop: 40 },
 });
