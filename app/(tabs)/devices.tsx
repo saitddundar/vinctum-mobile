@@ -1,32 +1,65 @@
+import { useEffect, useState } from "react";
 import { View, Text, FlatList, StyleSheet, Pressable, Alert } from "react-native";
 import { useDevices, useRevokeDevice } from "../../src/features/devices/hooks/useDevices";
+import { useApprovePairing } from "../../src/features/devices/hooks/usePairing";
 import { Device, DeviceType } from "../../src/features/devices/types";
+import { getStoredDeviceId } from "../../src/lib/device";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
 const deviceTypeLabel: Record<DeviceType, string> = {
   [DeviceType.PC]: "PC",
-  [DeviceType.PHONE]: "Telefon",
+  [DeviceType.PHONE]: "Phone",
   [DeviceType.TABLET]: "Tablet",
 };
 
-function DeviceItem({ device, onRevoke }: { device: Device; onRevoke: (id: string) => void }) {
+interface DeviceItemProps {
+  device: Device;
+  isSelf: boolean;
+  onRevoke: (id: string) => void;
+  onApprove: (id: string, approve: boolean) => void;
+  approving: boolean;
+}
+
+function DeviceItem({ device, isSelf, onRevoke, onApprove, approving }: DeviceItemProps) {
+  const showApprovalActions = !device.is_approved && !device.is_revoked && !isSelf;
+
   return (
     <View style={styles.card}>
       <View style={styles.cardHeader}>
         <Text style={styles.deviceName}>{device.name}</Text>
         <View style={[styles.badge, device.is_approved ? styles.approved : styles.pending]}>
           <Text style={[styles.badgeText, device.is_approved ? styles.approvedText : styles.pendingText]}>
-            {device.is_approved ? "Onaylı" : "Bekliyor"}
+            {device.is_approved ? "Approved" : "Pending"}
           </Text>
         </View>
       </View>
       <Text style={styles.meta}>{deviceTypeLabel[device.device_type]}</Text>
       <Text style={styles.meta}>
-        Son aktif: {device.last_active ? new Date(device.last_active).toLocaleDateString("tr") : "—"}
+        Last active: {device.last_active ? new Date(device.last_active).toLocaleDateString() : "—"}
       </Text>
-      {!device.is_revoked && (
+
+      {showApprovalActions && (
+        <View style={styles.approvalRow}>
+          <Pressable
+            style={[styles.approvalBtn, approving && styles.disabled]}
+            onPress={() => onApprove(device.device_id, false)}
+            disabled={approving}
+          >
+            <Text style={styles.rejectText}>Reject</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.approvalBtn, approving && styles.disabled]}
+            onPress={() => onApprove(device.device_id, true)}
+            disabled={approving}
+          >
+            <Text style={styles.approveText}>Approve</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {!device.is_revoked && device.is_approved && !isSelf && (
         <Pressable style={styles.revokeBtn} onPress={() => onRevoke(device.device_id)}>
-          <Text style={styles.revokeText}>Kaldır</Text>
+          <Text style={styles.revokeText}>Revoke</Text>
         </Pressable>
       )}
     </View>
@@ -34,14 +67,36 @@ function DeviceItem({ device, onRevoke }: { device: Device; onRevoke: (id: strin
 }
 
 export default function DevicesScreen() {
+  const [selfDeviceId, setSelfDeviceId] = useState<string | null>(null);
   const { data: devices, isLoading, refetch } = useDevices();
   const revoke = useRevokeDevice();
+  const approve = useApprovePairing();
+
+  useEffect(() => {
+    getStoredDeviceId().then(setSelfDeviceId);
+  }, []);
 
   const handleRevoke = (id: string) => {
-    Alert.alert("Cihaz Kaldır", "Bu cihazı kaldırmak istediğine emin misin?", [
-      { text: "İptal" },
-      { text: "Kaldır", style: "destructive", onPress: () => revoke.mutate(id) },
+    Alert.alert("Revoke Device", "Are you sure you want to revoke this device?", [
+      { text: "Cancel" },
+      { text: "Revoke", style: "destructive", onPress: () => revoke.mutate(id) },
     ]);
+  };
+
+  const handleApprove = (pendingId: string, doApprove: boolean) => {
+    if (!selfDeviceId) {
+      Alert.alert("Error", "Could not resolve this device's ID");
+      return;
+    }
+    approve.mutate(
+      { approver_device_id: selfDeviceId, pending_device_id: pendingId, approve: doApprove },
+      {
+        onSuccess: () =>
+          Alert.alert("Success", doApprove ? "Device approved" : "Device rejected"),
+        onError: (e: any) =>
+          Alert.alert("Error", e?.response?.data?.error || "Operation failed"),
+      }
+    );
   };
 
   return (
@@ -49,9 +104,17 @@ export default function DevicesScreen() {
       <FlatList
         data={devices}
         keyExtractor={(d) => d.device_id}
-        renderItem={({ item }) => <DeviceItem device={item} onRevoke={handleRevoke} />}
+        renderItem={({ item }) => (
+          <DeviceItem
+            device={item}
+            isSelf={item.device_id === selfDeviceId}
+            onRevoke={handleRevoke}
+            onApprove={handleApprove}
+            approving={approve.isPending}
+          />
+        )}
         ListEmptyComponent={
-          <Text style={styles.empty}>{isLoading ? "Yükleniyor..." : "Kayıtlı cihaz yok"}</Text>
+          <Text style={styles.empty}>{isLoading ? "Loading..." : "No registered devices"}</Text>
         }
         onRefresh={refetch}
         refreshing={isLoading}
@@ -80,6 +143,11 @@ const styles = StyleSheet.create({
   pending: { backgroundColor: "rgba(251, 191, 36, 0.15)" },
   pendingText: { color: colors.warning },
   meta: { fontSize: 13, color: colors.textSecondary, marginBottom: 2 },
+  approvalRow: { flexDirection: "row", justifyContent: "flex-end", gap: 16, marginTop: 10 },
+  approvalBtn: { paddingVertical: 4 },
+  approveText: { color: colors.success, fontSize: 14, fontWeight: "600" },
+  rejectText: { color: colors.error, fontSize: 14, fontWeight: "600" },
+  disabled: { opacity: 0.5 },
   revokeBtn: { marginTop: 10, alignSelf: "flex-end" },
   revokeText: { color: colors.error, fontSize: 13, fontWeight: "600" },
   empty: { textAlign: "center", color: colors.textMuted, marginTop: 40 },
