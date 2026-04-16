@@ -10,7 +10,6 @@ export function useNodeTransfers(nodeId: string) {
       return data.transfers;
     },
     enabled: !!nodeId,
-    refetchInterval: 5000,
   });
 }
 
@@ -22,7 +21,6 @@ export function useTransferDetail(transferId: string) {
       return data;
     },
     enabled: !!transferId,
-    refetchInterval: 3000,
   });
 }
 

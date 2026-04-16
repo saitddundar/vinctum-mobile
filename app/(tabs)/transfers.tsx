@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, FlatList, Pressable, StyleSheet, TextInput, Alert } from "react-native";
 import { useNodeTransfers, useCancelTransfer } from "../../src/features/transfer/hooks/useTransfers";
+import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
 import { useDownload } from "../../src/features/transfer/hooks/useDownload";
 import { Transfer, TransferStatus } from "../../src/features/transfer/types";
@@ -33,6 +34,8 @@ export default function TransfersScreen() {
   const uploadHook = useUpload();
   const downloadHook = useDownload();
   const cancel = useCancelTransfer();
+
+  useTransferEvents(nodeId);
 
   useEffect(() => {
     getStoredDeviceId().then((id) => setNodeId(id));
