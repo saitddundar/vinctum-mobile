@@ -4,6 +4,7 @@ import { useDevices, useRevokeDevice } from "../../src/features/devices/hooks/us
 import { useApprovePairing } from "../../src/features/devices/hooks/usePairing";
 import { Device, DeviceType } from "../../src/features/devices/types";
 import { getStoredDeviceId } from "../../src/lib/device";
+import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
 const deviceTypeLabel: Record<DeviceType, string> = {
@@ -85,16 +86,14 @@ export default function DevicesScreen() {
 
   const handleApprove = (pendingId: string, doApprove: boolean) => {
     if (!selfDeviceId) {
-      Alert.alert("Error", "Could not resolve this device's ID");
+      toast.error("Could not resolve this device's ID");
       return;
     }
     approve.mutate(
       { approver_device_id: selfDeviceId, pending_device_id: pendingId, approve: doApprove },
       {
-        onSuccess: () =>
-          Alert.alert("Success", doApprove ? "Device approved" : "Device rejected"),
-        onError: (e: any) =>
-          Alert.alert("Error", e?.response?.data?.error || "Operation failed"),
+        onSuccess: () => toast.success(doApprove ? "Device approved" : "Device rejected"),
+        onError: (e: any) => toast.error(e?.response?.data?.error || "Operation failed"),
       }
     );
   };

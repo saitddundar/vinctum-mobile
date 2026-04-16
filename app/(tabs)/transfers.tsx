@@ -6,6 +6,7 @@ import { useUpload } from "../../src/features/transfer/hooks/useUpload";
 import { useDownload } from "../../src/features/transfer/hooks/useDownload";
 import { Transfer, TransferStatus } from "../../src/features/transfer/types";
 import { getStoredDeviceId } from "../../src/lib/device";
+import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
 const statusLabel: Record<string, string> = {
@@ -43,16 +44,16 @@ export default function TransfersScreen() {
 
   const handleSend = async () => {
     if (!receiverNodeId || !receiverPubKey) {
-      Alert.alert("Error", "Receiver node ID and public key are required");
+      toast.error("Receiver node ID and public key are required");
       return;
     }
     try {
       const tid = await uploadHook.upload(receiverNodeId, receiverPubKey);
-      Alert.alert("Success", `Transfer started: ${tid}`);
+      toast.success(`Transfer started: ${tid.slice(0, 8)}…`);
       setReceiverNodeId("");
       setReceiverPubKey("");
     } catch (e: any) {
-      Alert.alert("Error", e?.response?.data?.error || e?.message || "Send failed");
+      toast.error(e?.response?.data?.error || e?.message || "Send failed");
     }
   };
 
@@ -60,8 +61,8 @@ export default function TransfersScreen() {
     setActiveDownloadId(t.transfer_id);
     downloadHook
       .download(t.transfer_id, t.sender_ephemeral_pubkey, t.filename)
-      .then((path) => Alert.alert("Downloaded", `File: ${path}`))
-      .catch((e) => Alert.alert("Error", e?.message || "Download failed"))
+      .then((path) => toast.success(`Saved: ${path.split("/").pop()}`))
+      .catch((e) => toast.error(e?.message || "Download failed"))
       .finally(() => setActiveDownloadId(null));
   };
 
@@ -74,7 +75,10 @@ export default function TransfersScreen() {
         onPress: () =>
           cancel.mutate(
             { transferId: t.transfer_id, reason: "user cancelled" },
-            { onError: (e: any) => Alert.alert("Error", e?.response?.data?.error || "Cancel failed") }
+            {
+              onSuccess: () => toast.success("Transfer cancelled"),
+              onError: (e: any) => toast.error(e?.response?.data?.error || "Cancel failed"),
+            }
           ),
       },
     ]);
