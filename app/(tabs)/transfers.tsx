@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { View, Text, FlatList, Pressable, StyleSheet, TextInput, Alert } from "react-native";
+import { useRouter } from "expo-router";
 import { useNodeTransfers, useCancelTransfer } from "../../src/features/transfer/hooks/useTransfers";
 import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
@@ -26,6 +27,7 @@ const statusColor: Record<string, string> = {
 };
 
 export default function TransfersScreen() {
+  const router = useRouter();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [receiverNodeId, setReceiverNodeId] = useState("");
   const [receiverPubKey, setReceiverPubKey] = useState("");
@@ -140,7 +142,10 @@ export default function TransfersScreen() {
             item.status === TransferStatus.COMPLETED && item.receiver_node_id === nodeId;
 
           return (
-            <View style={styles.card}>
+            <Pressable
+              style={styles.card}
+              onPress={() => router.push(`/transfers/${item.transfer_id}`)}
+            >
               <View style={styles.cardRow}>
                 <Text style={styles.filename} numberOfLines={1}>{item.filename}</Text>
                 <Text style={[styles.status, { color: statusColor[item.status] }]}>
@@ -190,7 +195,7 @@ export default function TransfersScreen() {
                   </Pressable>
                 )}
               </View>
-            </View>
+            </Pressable>
           );
         }}
         ListEmptyComponent={
