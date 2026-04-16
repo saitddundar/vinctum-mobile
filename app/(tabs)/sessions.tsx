@@ -3,6 +3,7 @@ import { View, Text, FlatList, Pressable, TextInput, StyleSheet, Alert } from "r
 import { useSessions, useCreateSession, useCloseSession, useJoinSession, useLeaveSession } from "../../src/features/sessions/hooks/useSessions";
 import { Session } from "../../src/features/sessions/types";
 import { getStoredDeviceId } from "../../src/lib/device";
+import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
 export default function SessionsScreen() {
@@ -23,15 +24,19 @@ export default function SessionsScreen() {
   const handleCreate = () => {
     if (!sessionName || !deviceId) return;
     create.mutate({ name: sessionName, deviceId }, {
-      onSuccess: () => { setSessionName(""); setShowCreate(false); },
-      onError: (e: any) => Alert.alert("Hata", e?.response?.data?.error || "Oluşturulamadı"),
+      onSuccess: () => {
+        setSessionName("");
+        setShowCreate(false);
+        toast.success("Session created");
+      },
+      onError: (e: any) => toast.error(e?.response?.data?.error || "Could not create session"),
     });
   };
 
   const handleClose = (id: string) => {
-    Alert.alert("Oturumu Kapat", "Bu oturumu kapatmak istediğine emin misin?", [
-      { text: "İptal" },
-      { text: "Kapat", style: "destructive", onPress: () => close.mutate(id) },
+    Alert.alert("Close Session", "Are you sure you want to close this session?", [
+      { text: "Cancel" },
+      { text: "Close", style: "destructive", onPress: () => close.mutate(id) },
     ]);
   };
 
@@ -40,14 +45,14 @@ export default function SessionsScreen() {
   return (
     <View style={styles.container}>
       <Pressable style={styles.createToggle} onPress={() => setShowCreate(!showCreate)}>
-        <Text style={styles.createToggleText}>{showCreate ? "İptal" : "+ Yeni Oturum"}</Text>
+        <Text style={styles.createToggleText}>{showCreate ? "Cancel" : "+ New Session"}</Text>
       </Pressable>
 
       {showCreate && (
         <View style={styles.createSection}>
           <TextInput
             style={[styles.input, inputFocused && styles.inputFocused]}
-            placeholder="Oturum adı"
+            placeholder="Session name"
             placeholderTextColor={colors.textMuted}
             value={sessionName}
             onChangeText={setSessionName}
@@ -59,7 +64,7 @@ export default function SessionsScreen() {
             onPress={handleCreate}
             disabled={create.isPending}
           >
-            <Text style={styles.buttonText}>{create.isPending ? "Oluşturuluyor..." : "Oluştur"}</Text>
+            <Text style={styles.buttonText}>{create.isPending ? "Creating..." : "Create"}</Text>
           </Pressable>
         </View>
       )}
@@ -73,12 +78,12 @@ export default function SessionsScreen() {
               <Text style={styles.sessionName}>{item.name}</Text>
               <View style={[styles.badge, item.is_active ? styles.active : styles.closed]}>
                 <Text style={[styles.badgeText, item.is_active ? styles.activeText : styles.closedText]}>
-                  {item.is_active ? "Aktif" : "Kapalı"}
+                  {item.is_active ? "Active" : "Closed"}
                 </Text>
               </View>
             </View>
             <Text style={styles.meta}>
-              {item.devices?.length || 0} cihaz • {new Date(item.created_at).toLocaleDateString("tr")}
+              {item.devices?.length || 0} devices • {new Date(item.created_at).toLocaleDateString()}
             </Text>
 
             {item.is_active && (
@@ -89,10 +94,10 @@ export default function SessionsScreen() {
                       style={styles.actionBtn}
                       onPress={() => deviceId && leave.mutate({ sessionId: item.session_id, deviceId })}
                     >
-                      <Text style={styles.leaveText}>Ayrıl</Text>
+                      <Text style={styles.leaveText}>Leave</Text>
                     </Pressable>
                     <Pressable style={styles.actionBtn} onPress={() => handleClose(item.session_id)}>
-                      <Text style={styles.closeText}>Kapat</Text>
+                      <Text style={styles.closeText}>Close</Text>
                     </Pressable>
                   </>
                 ) : (
@@ -100,7 +105,7 @@ export default function SessionsScreen() {
                     style={styles.actionBtn}
                     onPress={() => deviceId && join.mutate({ sessionId: item.session_id, deviceId })}
                   >
-                    <Text style={styles.joinText}>Katıl</Text>
+                    <Text style={styles.joinText}>Join</Text>
                   </Pressable>
                 )}
               </View>
@@ -108,7 +113,7 @@ export default function SessionsScreen() {
           </View>
         )}
         ListEmptyComponent={
-          <Text style={styles.empty}>{isLoading ? "Yükleniyor..." : "Oturum yok"}</Text>
+          <Text style={styles.empty}>{isLoading ? "Loading..." : "No sessions"}</Text>
         }
         onRefresh={refetch}
         refreshing={isLoading}

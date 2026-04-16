@@ -15,10 +15,10 @@ import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 const TABS = [
   { name: "index", icon: "home-outline", iconActive: "home", label: "Home" },
-  { name: "devices", icon: "phone-portrait-outline", iconActive: "phone-portrait", label: "Cihazlar" },
-  { name: "transfers", icon: "swap-horizontal-outline", iconActive: "swap-horizontal", label: "Transfer" },
-  { name: "pairing", icon: "qr-code-outline", iconActive: "qr-code", label: "Eşleştir" },
-  { name: "sessions", icon: "people-outline", iconActive: "people", label: "Oturumlar" },
+  { name: "devices", icon: "phone-portrait-outline", iconActive: "phone-portrait", label: "Devices" },
+  { name: "transfers", icon: "swap-horizontal-outline", iconActive: "swap-horizontal", label: "Transfers" },
+  { name: "pairing", icon: "qr-code-outline", iconActive: "qr-code", label: "Pair" },
+  { name: "sessions", icon: "people-outline", iconActive: "people", label: "Sessions" },
 ] as const;
 
 type IconName = typeof TABS[number]["icon"] | typeof TABS[number]["iconActive"];

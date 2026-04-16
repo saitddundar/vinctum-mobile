@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { api } from "../../src/api/client";
+import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
 export default function RegisterScreen() {
@@ -17,11 +18,10 @@ export default function RegisterScreen() {
     setLoading(true);
     try {
       await api.post("/api/v1/auth/register", { username, email, password });
-      Alert.alert("Başarılı", "Kayıt tamamlandı. Email doğrulamanı yap ve giriş yap.", [
-        { text: "Tamam", onPress: () => router.replace("/(auth)/login") },
-      ]);
+      toast.success("Account created. Verify your email and sign in.");
+      router.replace("/(auth)/login");
     } catch (e: any) {
-      Alert.alert("Hata", e?.response?.data?.error || "Kayıt başarısız");
+      toast.error(e?.response?.data?.error || "Registration failed");
     } finally {
       setLoading(false);
     }
@@ -36,15 +36,15 @@ export default function RegisterScreen() {
         <View style={styles.header}>
           <Text style={styles.brand}>V</Text>
           <Text style={styles.title}>Vinctum</Text>
-          <Text style={styles.subtitle}>Yeni hesap oluştur</Text>
+          <Text style={styles.subtitle}>Create a new account</Text>
         </View>
 
         <View style={styles.form}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Kullanıcı Adı</Text>
+            <Text style={styles.label}>Username</Text>
             <TextInput
               style={[styles.input, focused === "username" && styles.inputFocused]}
-              placeholder="kullanici_adi"
+              placeholder="username"
               placeholderTextColor={colors.textMuted}
               value={username}
               onChangeText={setUsername}
@@ -58,7 +58,7 @@ export default function RegisterScreen() {
             <Text style={styles.label}>Email</Text>
             <TextInput
               style={[styles.input, focused === "email" && styles.inputFocused]}
-              placeholder="mail@ornek.com"
+              placeholder="you@example.com"
               placeholderTextColor={colors.textMuted}
               value={email}
               onChangeText={setEmail}
@@ -70,7 +70,7 @@ export default function RegisterScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Şifre</Text>
+            <Text style={styles.label}>Password</Text>
             <TextInput
               style={[styles.input, focused === "password" && styles.inputFocused]}
               placeholder="••••••••"
@@ -88,13 +88,13 @@ export default function RegisterScreen() {
             onPress={handleRegister}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>{loading ? "Kaydediliyor..." : "Kayıt Ol"}</Text>
+            <Text style={styles.buttonText}>{loading ? "Creating..." : "Sign Up"}</Text>
           </Pressable>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Zaten hesabın var mı? </Text>
-          <Link href="/(auth)/login" style={styles.link}>Giriş yap</Link>
+          <Text style={styles.footerText}>Already have an account? </Text>
+          <Link href="/(auth)/login" style={styles.link}>Sign in</Link>
         </View>
       </View>
     </KeyboardAvoidingView>

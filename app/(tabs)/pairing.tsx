@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, Alert } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useGeneratePairingCode, useRedeemPairingCode } from "../../src/features/devices/hooks/usePairing";
 import { getStoredDeviceId } from "../../src/lib/device";
 import { DeviceType } from "../../src/features/devices/types";
+import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
 export default function PairingScreen() {
@@ -15,13 +16,13 @@ export default function PairingScreen() {
           style={[styles.tab, tab === "generate" && styles.activeTab]}
           onPress={() => setTab("generate")}
         >
-          <Text style={[styles.tabText, tab === "generate" && styles.activeTabText]}>Kod Üret</Text>
+          <Text style={[styles.tabText, tab === "generate" && styles.activeTabText]}>Generate Code</Text>
         </Pressable>
         <Pressable
           style={[styles.tab, tab === "redeem" && styles.activeTab]}
           onPress={() => setTab("redeem")}
         >
-          <Text style={[styles.tabText, tab === "redeem" && styles.activeTabText]}>Kod Gir</Text>
+          <Text style={[styles.tabText, tab === "redeem" && styles.activeTabText]}>Enter Code</Text>
         </Pressable>
       </View>
 
@@ -38,7 +39,7 @@ function GenerateTab() {
   const handleGenerate = async () => {
     const deviceId = await getStoredDeviceId();
     if (!deviceId) {
-      Alert.alert("Hata", "Önce cihaz kaydı yapılmalı");
+      toast.error("Device must be registered first");
       return;
     }
     generate.mutate({ device_id: deviceId }, {
@@ -46,25 +47,25 @@ function GenerateTab() {
         setCode(data.pairing_code);
         setExpiresIn(data.expires_in_s);
       },
-      onError: (e: any) => Alert.alert("Hata", e?.response?.data?.error || "Kod üretilemedi"),
+      onError: (e: any) => toast.error(e?.response?.data?.error || "Could not generate code"),
     });
   };
 
   return (
     <View style={styles.section}>
-      <Text style={styles.desc}>Yeni bir cihazı eşleştirmek için kod üret ve o cihazda gir.</Text>
+      <Text style={styles.desc}>Generate a code and enter it on the device you want to pair.</Text>
       <Pressable
         style={[styles.button, generate.isPending && styles.disabled]}
         onPress={handleGenerate}
         disabled={generate.isPending}
       >
-        <Text style={styles.buttonText}>{generate.isPending ? "Üretiliyor..." : "Kod Üret"}</Text>
+        <Text style={styles.buttonText}>{generate.isPending ? "Generating..." : "Generate Code"}</Text>
       </Pressable>
       {code && (
         <View style={styles.codeBox}>
-          <Text style={styles.codeLabel}>Eşleştirme Kodu</Text>
+          <Text style={styles.codeLabel}>Pairing Code</Text>
           <Text style={styles.code}>{code}</Text>
-          <Text style={styles.expires}>{Math.floor(expiresIn / 60)} dakika geçerli</Text>
+          <Text style={styles.expires}>Valid for {Math.floor(expiresIn / 60)} minutes</Text>
         </View>
       )}
     </View>
@@ -88,18 +89,18 @@ function RedeemTab() {
         node_id: `node-${Date.now()}`,
       },
       {
-        onSuccess: () => Alert.alert("Başarılı", "Eşleştirme isteği gönderildi. Onay bekleniyor."),
-        onError: (e: any) => Alert.alert("Hata", e?.response?.data?.error || "Kod geçersiz"),
+        onSuccess: () => toast.success("Pairing request sent. Awaiting approval."),
+        onError: (e: any) => toast.error(e?.response?.data?.error || "Invalid code"),
       }
     );
   };
 
   return (
     <View style={styles.section}>
-      <Text style={styles.desc}>Başka bir cihazdan aldığın kodu gir.</Text>
+      <Text style={styles.desc}>Enter the code you received from another device.</Text>
       <TextInput
         style={[styles.input, inputFocused === "code" && styles.inputFocused]}
-        placeholder="Eşleştirme kodu"
+        placeholder="Pairing code"
         placeholderTextColor={colors.textMuted}
         value={pairingCode}
         onChangeText={setPairingCode}
@@ -109,7 +110,7 @@ function RedeemTab() {
       />
       <TextInput
         style={[styles.input, inputFocused === "name" && styles.inputFocused]}
-        placeholder="Bu cihazın adı"
+        placeholder="Name for this device"
         placeholderTextColor={colors.textMuted}
         value={deviceName}
         onChangeText={setDeviceName}
@@ -121,7 +122,7 @@ function RedeemTab() {
         onPress={handleRedeem}
         disabled={redeem.isPending}
       >
-        <Text style={styles.buttonText}>{redeem.isPending ? "Gönderiliyor..." : "Eşleştir"}</Text>
+        <Text style={styles.buttonText}>{redeem.isPending ? "Sending..." : "Pair"}</Text>
       </Pressable>
     </View>
   );

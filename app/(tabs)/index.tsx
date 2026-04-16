@@ -14,14 +14,14 @@ export default function HomeScreen() {
 
       {user && (
         <View style={styles.card}>
-          <Text style={styles.cardLabel}>Hoşgeldin</Text>
+          <Text style={styles.cardLabel}>Welcome</Text>
           <Text style={styles.cardValue}>{user.username}</Text>
           <Text style={styles.cardMeta}>{user.email}</Text>
         </View>
       )}
 
       <Pressable style={styles.logoutBtn} onPress={logout}>
-        <Text style={styles.logoutText}>Çıkış Yap</Text>
+        <Text style={styles.logoutText}>Log Out</Text>
       </Pressable>
     </View>
   );

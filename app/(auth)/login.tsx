@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
 import { Link } from "expo-router";
 import { useAuthStore } from "../../src/store/auth";
+import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
 export default function LoginScreen() {
@@ -17,7 +18,7 @@ export default function LoginScreen() {
     try {
       await login(email, password);
     } catch (e: any) {
-      Alert.alert("Hata", e?.response?.data?.error || "Giriş başarısız");
+      toast.error(e?.response?.data?.error || "Login failed");
     } finally {
       setLoading(false);
     }
@@ -32,7 +33,7 @@ export default function LoginScreen() {
         <View style={styles.header}>
           <Text style={styles.brand}>V</Text>
           <Text style={styles.title}>Vinctum</Text>
-          <Text style={styles.subtitle}>Hesabına giriş yap</Text>
+          <Text style={styles.subtitle}>Sign in to your account</Text>
         </View>
 
         <View style={styles.form}>
@@ -40,7 +41,7 @@ export default function LoginScreen() {
             <Text style={styles.label}>Email</Text>
             <TextInput
               style={[styles.input, focused === "email" && styles.inputFocused]}
-              placeholder="mail@ornek.com"
+              placeholder="you@example.com"
               placeholderTextColor={colors.textMuted}
               value={email}
               onChangeText={setEmail}
@@ -52,7 +53,7 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Şifre</Text>
+            <Text style={styles.label}>Password</Text>
             <TextInput
               style={[styles.input, focused === "password" && styles.inputFocused]}
               placeholder="••••••••"
@@ -70,13 +71,13 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>{loading ? "Giriş yapılıyor..." : "Giriş Yap"}</Text>
+            <Text style={styles.buttonText}>{loading ? "Signing in..." : "Sign In"}</Text>
           </Pressable>
         </View>
 
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Hesabın yok mu? </Text>
-          <Link href="/(auth)/register" style={styles.link}>Kayıt ol</Link>
+          <Text style={styles.footerText}>Don't have an account? </Text>
+          <Link href="/(auth)/register" style={styles.link}>Sign up</Link>
         </View>
       </View>
     </KeyboardAvoidingView>

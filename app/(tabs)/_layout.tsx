@@ -16,10 +16,10 @@ export default function TabsLayout() {
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="devices" options={{ title: "Cihazlar" }} />
-      <Tabs.Screen name="transfers" options={{ title: "Transfer" }} />
-      <Tabs.Screen name="pairing" options={{ title: "Eşleştir" }} />
-      <Tabs.Screen name="sessions" options={{ title: "Oturumlar" }} />
+      <Tabs.Screen name="devices" options={{ title: "Devices" }} />
+      <Tabs.Screen name="transfers" options={{ title: "Transfers" }} />
+      <Tabs.Screen name="pairing" options={{ title: "Pair" }} />
+      <Tabs.Screen name="sessions" options={{ title: "Sessions" }} />
     </Tabs>
   );
 }
