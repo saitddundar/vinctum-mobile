@@ -1,11 +1,5 @@
-import { useEffect } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast, ToastType } from "../lib/toast";
 import { colors, radius, spacing } from "../lib/theme";
@@ -20,37 +14,32 @@ const typeColor: Record<ToastType, string> = {
 export function Toast() {
   const insets = useSafeAreaInsets();
   const { message, type, id, hide } = useToast();
-  const translateY = useSharedValue(-100);
-  const opacity = useSharedValue(0);
+  const translateY = useRef(new Animated.Value(-100)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!message) return;
-    translateY.value = withSpring(0, { damping: 18, stiffness: 180 });
-    opacity.value = withTiming(1, { duration: 180 });
+    Animated.parallel([
+      Animated.spring(translateY, { toValue: 0, damping: 18, stiffness: 180, mass: 1, useNativeDriver: true }),
+      Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
 
     const t = setTimeout(() => {
-      translateY.value = withTiming(-100, { duration: 220 });
-      opacity.value = withTiming(0, { duration: 220 }, (done) => {
-        if (done) {
-          // run on JS thread
-        }
-      });
+      Animated.parallel([
+        Animated.timing(translateY, { toValue: -100, duration: 220, useNativeDriver: true }),
+        Animated.timing(opacity, { toValue: 0, duration: 220, useNativeDriver: true }),
+      ]).start();
       setTimeout(hide, 240);
     }, 2800);
     return () => clearTimeout(t);
   }, [id]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-    opacity: opacity.value,
-  }));
 
   if (!message) return null;
 
   return (
     <Animated.View
       pointerEvents="box-none"
-      style={[styles.wrapper, { top: insets.top + spacing.sm }, animStyle]}
+      style={[styles.wrapper, { top: insets.top + spacing.sm }, { transform: [{ translateY }], opacity }]}
     >
       <Pressable onPress={hide} style={[styles.toast, { borderColor: typeColor[type] }]}>
         <View style={[styles.dot, { backgroundColor: typeColor[type] }]} />

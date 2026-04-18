@@ -2,21 +2,13 @@ import { View, Pressable, StyleSheet, Platform } from "react-native";
 import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import Animated, {
-  useAnimatedStyle,
-  withSpring,
-  useSharedValue,
-  withTiming,
-  interpolateColor,
-} from "react-native-reanimated";
-import { useEffect } from "react";
 import { colors, radius } from "../lib/theme";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 const TABS = [
   { name: "index", icon: "home-outline", iconActive: "home", label: "Home" },
   { name: "devices", icon: "phone-portrait-outline", iconActive: "phone-portrait", label: "Devices" },
-  { name: "transfers", icon: "swap-horizontal-outline", iconActive: "swap-horizontal", label: "Transfers" },
+  { name: "transfers", icon: "swap-horizontal-outline", iconActive: "swap-horizontal", label: "Transfer" },
   { name: "pairing", icon: "qr-code-outline", iconActive: "qr-code", label: "Pair" },
   { name: "sessions", icon: "people-outline", iconActive: "people", label: "Sessions" },
 ] as const;
@@ -29,42 +21,21 @@ function TabItem({ active, icon, iconActive, onPress }: {
   iconActive: IconName;
   onPress: () => void;
 }) {
-  const scale = useSharedValue(1);
-  const progress = useSharedValue(active ? 1 : 0);
-
-  useEffect(() => {
-    progress.value = withTiming(active ? 1 : 0, { duration: 250 });
-  }, [active]);
-
-  const pillStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(
-      progress.value,
-      [0, 1],
-      ["transparent", colors.accentDim]
-    ),
-    transform: [{ scale: scale.value }],
-  }));
-
-  const iconStyle = useAnimatedStyle(() => ({
-    opacity: withTiming(active ? 1 : 0.4, { duration: 200 }),
-  }));
-
   return (
     <Pressable
       onPress={onPress}
-      onPressIn={() => { scale.value = withSpring(0.85, { damping: 15 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 15 }); }}
-      style={styles.tabPressable}
+      style={({ pressed }) => [
+        styles.tabPressable,
+        pressed && { transform: [{ scale: 0.88 }] },
+      ]}
     >
-      <Animated.View style={[styles.pill, pillStyle]}>
-        <Animated.View style={iconStyle}>
-          <Ionicons
-            name={active ? iconActive : icon}
-            size={22}
-            color={active ? colors.accent : colors.textSecondary}
-          />
-        </Animated.View>
-      </Animated.View>
+      <View style={[styles.pill, active && styles.pillActive]}>
+        <Ionicons
+          name={active ? iconActive : icon}
+          size={22}
+          color={active ? colors.accent : colors.textSecondary}
+        />
+      </View>
       {active && <View style={styles.dot} />}
     </Pressable>
   );
@@ -149,6 +120,9 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     alignItems: "center",
     justifyContent: "center",
+  },
+  pillActive: {
+    backgroundColor: colors.accentDim,
   },
   dot: {
     width: 4,
