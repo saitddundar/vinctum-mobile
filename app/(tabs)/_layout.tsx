@@ -7,11 +7,7 @@ export default function TabsLayout() {
     <Tabs
       tabBar={(props) => <DockTabBar {...props} />}
       screenOptions={{
-        headerShown: true,
-        headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.text,
-        headerTitleStyle: { fontWeight: "600" },
-        headerShadowVisible: false,
+        headerShown: false,
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
