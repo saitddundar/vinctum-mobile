@@ -1,11 +1,22 @@
-import QuickCrypto from "react-native-quick-crypto";
+// Lazy-load so the module doesn't crash in Expo Go where NitroModules are absent.
+let _qc: any;
+function QC() {
+  if (!_qc) {
+    try {
+      _qc = require("react-native-quick-crypto").default ?? require("react-native-quick-crypto");
+    } catch {
+      throw new Error("react-native-quick-crypto is not available — use a development build (expo prebuild).");
+    }
+  }
+  return _qc;
+}
 
 // Matches vinctum-core pkg/crypto/ecdh.go exactly:
 // salt = ephemeralPub || receiverStaticPub
 // info = "vinctum-transfer-v1:<transferId>"
 
 export function generateX25519KeyPair(): { privateKey: Buffer; publicKey: Buffer } {
-  const keyPair = QuickCrypto.generateKeyPairSync("x25519") as any;
+  const keyPair = QC().generateKeyPairSync("x25519") as any;
   const privDer = keyPair.privateKey.export({ type: "pkcs8", format: "der" });
   const pubDer = keyPair.publicKey.export({ type: "spki", format: "der" });
   return {
@@ -15,17 +26,17 @@ export function generateX25519KeyPair(): { privateKey: Buffer; publicKey: Buffer
 }
 
 export function ecdh(localPrivateKey: Buffer, remotePubKey: Buffer): Buffer {
-  const priv = QuickCrypto.createPrivateKey({
+  const priv = QC().createPrivateKey({
     key: buildX25519Pkcs8(localPrivateKey),
     format: "der",
     type: "pkcs8",
   });
-  const pub = QuickCrypto.createPublicKey({
+  const pub = QC().createPublicKey({
     key: buildX25519Spki(remotePubKey),
     format: "der",
     type: "spki",
   });
-  const secret = QuickCrypto.diffieHellman({ privateKey: priv as any, publicKey: pub as any });
+  const secret = QC().diffieHellman({ privateKey: priv as any, publicKey: pub as any });
   return Buffer.from(secret as any);
 }
 
@@ -37,13 +48,13 @@ export function deriveTransferKey(
 ): Buffer {
   const salt = Buffer.concat([ephemeralPub, receiverStaticPub]);
   const info = Buffer.from(`vinctum-transfer-v1:${transferId}`);
-  const derived = QuickCrypto.hkdfSync("sha256", sharedSecret, salt, info, 32);
+  const derived = QC().hkdfSync("sha256", sharedSecret, salt, info, 32);
   return Buffer.from(derived as any);
 }
 
 export function encryptAESGCM(key: Buffer, plaintext: Buffer): Buffer {
-  const nonce = Buffer.from(QuickCrypto.randomBytes(12));
-  const cipher = (QuickCrypto as any).createCipheriv("aes-256-gcm", key, nonce);
+  const nonce = Buffer.from(QC().randomBytes(12));
+  const cipher = (QC() as any).createCipheriv("aes-256-gcm", key, nonce);
   const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   const tag = cipher.getAuthTag();
   // nonce(12) || ciphertext || tag(16) — matches Go's gcm.Seal
@@ -55,13 +66,13 @@ export function decryptAESGCM(key: Buffer, data: Buffer): Buffer {
   const nonce = data.subarray(0, 12);
   const tag = data.subarray(data.length - 16);
   const ciphertext = data.subarray(12, data.length - 16);
-  const decipher = (QuickCrypto as any).createDecipheriv("aes-256-gcm", key, nonce);
+  const decipher = (QC() as any).createDecipheriv("aes-256-gcm", key, nonce);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 }
 
 export function sha256(data: Buffer): string {
-  const hash = (QuickCrypto as any).createHash("sha256");
+  const hash = (QC() as any).createHash("sha256");
   hash.update(data);
   return hash.digest("hex");
 }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "../../../lib/storage";
 import { API_BASE_URL } from "../../../api/client";
 import { TransferEvent } from "../types";
 

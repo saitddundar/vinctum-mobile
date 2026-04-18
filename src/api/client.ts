@@ -1,7 +1,24 @@
 import axios from "axios";
-import * as SecureStore from "expo-secure-store";
+import { Platform } from "react-native";
+import * as SecureStore from "../lib/storage";
+import Constants from "expo-constants";
 
-export const API_BASE_URL = "http://localhost:8080";
+function getBaseUrl() {
+  // Physical device: use LAN IP from Expo's debuggerHost
+  const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest2?.extra?.expoGo?.debuggerHost;
+  if (debuggerHost) {
+    const lanIp = debuggerHost.split(":")[0];
+    if (lanIp && lanIp !== "localhost" && lanIp !== "127.0.0.1") {
+      return `http://${lanIp}:8080`;
+    }
+  }
+  // Android emulator → host machine
+  if (Platform.OS === "android") return "http://10.0.2.2:8080";
+  // iOS simulator / web
+  return "http://localhost:8080";
+}
+
+export const API_BASE_URL = getBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

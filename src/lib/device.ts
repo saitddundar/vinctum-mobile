@@ -1,5 +1,5 @@
 import { Platform } from "react-native";
-import * as SecureStore from "expo-secure-store";
+import * as SecureStore from "./storage";
 import Constants from "expo-constants";
 import { DeviceType } from "../features/devices/types";
 
