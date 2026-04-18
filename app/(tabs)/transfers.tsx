@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { View, Text, FlatList, Pressable, StyleSheet, TextInput, Alert } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { useNodeTransfers, useCancelTransfer } from "../../src/features/transfer/hooks/useTransfers";
 import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
@@ -10,14 +12,6 @@ import { getStoredDeviceId } from "../../src/lib/device";
 import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 
-const statusLabel: Record<string, string> = {
-  [TransferStatus.PENDING]: "Pending",
-  [TransferStatus.IN_PROGRESS]: "In progress",
-  [TransferStatus.COMPLETED]: "Completed",
-  [TransferStatus.CANCELLED]: "Cancelled",
-  [TransferStatus.FAILED]: "Failed",
-};
-
 const statusColor: Record<string, string> = {
   [TransferStatus.PENDING]: colors.warning,
   [TransferStatus.IN_PROGRESS]: colors.accent,
@@ -26,14 +20,30 @@ const statusColor: Record<string, string> = {
   [TransferStatus.FAILED]: colors.error,
 };
 
+const statusIcon: Record<string, string> = {
+  [TransferStatus.PENDING]: "time-outline",
+  [TransferStatus.IN_PROGRESS]: "arrow-up-circle-outline",
+  [TransferStatus.COMPLETED]: "checkmark-circle-outline",
+  [TransferStatus.CANCELLED]: "close-circle-outline",
+  [TransferStatus.FAILED]: "alert-circle-outline",
+};
+
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export default function TransfersScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const [nodeId, setNodeId] = useState<string | null>(null);
+  const [showSend, setShowSend] = useState(false);
   const [receiverNodeId, setReceiverNodeId] = useState("");
   const [receiverPubKey, setReceiverPubKey] = useState("");
-  const [inputFocused, setInputFocused] = useState<string | null>(null);
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
-  const { data: transfers, isLoading } = useNodeTransfers(nodeId || "");
+  const [filter, setFilter] = useState<"all" | "active" | "done">("all");
+  const { data: transfers, isLoading, refetch } = useNodeTransfers(nodeId || "");
   const uploadHook = useUpload();
   const downloadHook = useDownload();
   const cancel = useCancelTransfer();
@@ -41,19 +51,26 @@ export default function TransfersScreen() {
   useTransferEvents(nodeId);
 
   useEffect(() => {
-    getStoredDeviceId().then((id) => setNodeId(id));
+    getStoredDeviceId().then(setNodeId);
   }, []);
+
+  const filtered = (transfers || []).filter((t) => {
+    if (filter === "active") return t.status === TransferStatus.PENDING || t.status === TransferStatus.IN_PROGRESS;
+    if (filter === "done") return t.status === TransferStatus.COMPLETED;
+    return true;
+  });
 
   const handleSend = async () => {
     if (!receiverNodeId || !receiverPubKey) {
-      toast.error("Receiver node ID and public key are required");
+      toast.error("Receiver node ID and public key required");
       return;
     }
     try {
       const tid = await uploadHook.upload(receiverNodeId, receiverPubKey);
-      toast.success(`Transfer started: ${tid.slice(0, 8)}…`);
+      toast.success(`Transfer started`);
       setReceiverNodeId("");
       setReceiverPubKey("");
+      setShowSend(false);
     } catch (e: any) {
       toast.error(e?.response?.data?.error || e?.message || "Send failed");
     }
@@ -69,10 +86,10 @@ export default function TransfersScreen() {
   };
 
   const handleCancel = (t: Transfer) => {
-    Alert.alert("Cancel Transfer", `Cancel transfer of "${t.filename}"?`, [
+    Alert.alert("Cancel Transfer", `Cancel "${t.filename}"?`, [
       { text: "Keep" },
       {
-        text: "Cancel transfer",
+        text: "Cancel",
         style: "destructive",
         onPress: () =>
           cancel.mutate(
@@ -87,128 +104,139 @@ export default function TransfersScreen() {
   };
 
   const isDownloading = (id: string) => activeDownloadId === id && downloadHook.downloading;
-  const downloadPercent = (id: string) =>
-    isDownloading(id) && downloadHook.totalChunks > 0
-      ? Math.round((downloadHook.progress / downloadHook.totalChunks) * 100)
-      : 0;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.sendSection}>
-        <Text style={styles.sectionTitle}>Send File</Text>
-        <TextInput
-          style={[styles.input, inputFocused === "node" && styles.inputFocused]}
-          placeholder="Receiver Node ID"
-          placeholderTextColor={colors.textMuted}
-          value={receiverNodeId}
-          onChangeText={setReceiverNodeId}
-          autoCapitalize="none"
-          onFocus={() => setInputFocused("node")}
-          onBlur={() => setInputFocused(null)}
-        />
-        <TextInput
-          style={[styles.input, inputFocused === "key" && styles.inputFocused]}
-          placeholder="Receiver Public Key (base64)"
-          placeholderTextColor={colors.textMuted}
-          value={receiverPubKey}
-          onChangeText={setReceiverPubKey}
-          autoCapitalize="none"
-          onFocus={() => setInputFocused("key")}
-          onBlur={() => setInputFocused(null)}
-        />
-        <Pressable
-          style={[styles.button, uploadHook.uploading && styles.disabled]}
-          onPress={handleSend}
-          disabled={uploadHook.uploading}
-        >
-          <Text style={styles.buttonText}>
-            {uploadHook.uploading
-              ? `Uploading ${uploadHook.progress}/${uploadHook.totalChunks}`
-              : "Pick File and Send"}
-          </Text>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <View style={styles.topRow}>
+        <Text style={styles.header}>Transfers</Text>
+        <Pressable style={styles.sendToggle} onPress={() => setShowSend(!showSend)}>
+          <Ionicons name={showSend ? "close" : "add"} size={20} color="#fff" />
         </Pressable>
       </View>
 
-      <Text style={styles.sectionTitle}>Transfers</Text>
+      {showSend && (
+        <View style={styles.sendSection}>
+          <TextInput
+            style={styles.input}
+            placeholder="Receiver Node ID"
+            placeholderTextColor={colors.textMuted}
+            value={receiverNodeId}
+            onChangeText={setReceiverNodeId}
+            autoCapitalize="none"
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Receiver Public Key (base64)"
+            placeholderTextColor={colors.textMuted}
+            value={receiverPubKey}
+            onChangeText={setReceiverPubKey}
+            autoCapitalize="none"
+          />
+          <Pressable
+            style={[styles.button, uploadHook.uploading && styles.disabled]}
+            onPress={handleSend}
+            disabled={uploadHook.uploading}
+          >
+            <Ionicons name="cloud-upload-outline" size={18} color="#fff" />
+            <Text style={styles.buttonText}>
+              {uploadHook.uploading ? `Uploading ${uploadHook.progress}/${uploadHook.totalChunks}` : "Pick File & Send"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
+      <View style={styles.filters}>
+        {(["all", "active", "done"] as const).map((f) => (
+          <Pressable key={f} style={[styles.filterBtn, filter === f && styles.filterActive]} onPress={() => setFilter(f)}>
+            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
+              {f === "all" ? "All" : f === "active" ? "Active" : "Completed"}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       <FlatList
-        data={transfers}
+        data={filtered}
         keyExtractor={(t) => t.transfer_id}
         renderItem={({ item }) => {
           const downloading = isDownloading(item.transfer_id);
-          const dlPercent = downloadPercent(item.transfer_id);
-          const canCancel =
-            item.status === TransferStatus.PENDING || item.status === TransferStatus.IN_PROGRESS;
-          const canDownload =
-            item.status === TransferStatus.COMPLETED && item.receiver_node_id === nodeId;
+          const canCancel = item.status === TransferStatus.PENDING || item.status === TransferStatus.IN_PROGRESS;
+          const canDownload = item.status === TransferStatus.COMPLETED && item.receiver_node_id === nodeId;
+          const col = statusColor[item.status] || colors.accent;
 
           return (
-            <Pressable
-              style={styles.card}
-              onPress={() => router.push(`/transfers/${item.transfer_id}`)}
-            >
-              <View style={styles.cardRow}>
-                <Text style={styles.filename} numberOfLines={1}>{item.filename}</Text>
-                <Text style={[styles.status, { color: statusColor[item.status] }]}>
-                  {statusLabel[item.status] || item.status}
-                </Text>
+            <Pressable style={styles.card} onPress={() => router.push(`/transfers/${item.transfer_id}`)}>
+              <View style={styles.cardTop}>
+                <View style={[styles.statusDot, { backgroundColor: col }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.filename} numberOfLines={1}>{item.filename}</Text>
+                  <Text style={styles.meta}>{formatSize(item.total_size_bytes)}</Text>
+                </View>
+                <Ionicons name={statusIcon[item.status] as any} size={20} color={col} />
               </View>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, {
-                  width: `${item.progress_percent}%`,
-                  backgroundColor: statusColor[item.status] || colors.accent,
-                }]} />
-              </View>
-              <Text style={styles.meta}>
-                {(item.total_size_bytes / 1024).toFixed(0)} KB • {item.progress_percent}%
-              </Text>
 
-              {downloading && (
-                <>
-                  <View style={[styles.progressTrack, { marginTop: 6 }]}>
-                    <View style={[styles.progressFill, { width: `${dlPercent}%`, backgroundColor: colors.accent }]} />
-                  </View>
-                  <Text style={styles.meta}>
-                    Downloading {downloadHook.progress}/{downloadHook.totalChunks} ({dlPercent}%)
-                  </Text>
-                </>
+              {(item.status === TransferStatus.IN_PROGRESS || item.status === TransferStatus.PENDING) && (
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, { width: `${item.progress_percent}%`, backgroundColor: col }]} />
+                </View>
               )}
 
-              <View style={styles.actionsRow}>
-                {canCancel && (
-                  <Pressable
-                    style={styles.actionBtn}
-                    onPress={() => handleCancel(item)}
-                    disabled={cancel.isPending}
-                  >
-                    <Text style={styles.cancelText}>Cancel</Text>
-                  </Pressable>
-                )}
-                {canDownload && (
-                  <Pressable
-                    style={styles.actionBtn}
-                    onPress={() => handleDownload(item)}
-                    disabled={downloading}
-                  >
-                    <Text style={[styles.downloadText, downloading && styles.disabledText]}>
-                      {downloading ? "Downloading..." : "Download"}
-                    </Text>
-                  </Pressable>
-                )}
+              {downloading && (
+                <View style={styles.progressTrack}>
+                  <View style={[styles.progressFill, {
+                    width: `${downloadHook.totalChunks > 0 ? Math.round((downloadHook.progress / downloadHook.totalChunks) * 100) : 0}%`,
+                    backgroundColor: colors.accent,
+                  }]} />
+                </View>
+              )}
+
+              <View style={styles.cardActions}>
+                <Text style={[styles.percent, { color: col }]}>{item.progress_percent}%</Text>
+                <View style={{ flexDirection: "row", gap: 16 }}>
+                  {canCancel && (
+                    <Pressable onPress={() => handleCancel(item)}>
+                      <Text style={styles.cancelText}>Cancel</Text>
+                    </Pressable>
+                  )}
+                  {canDownload && (
+                    <Pressable onPress={() => handleDownload(item)} disabled={downloading}>
+                      <Text style={[styles.downloadText, downloading && { opacity: 0.5 }]}>
+                        {downloading ? "Downloading..." : "Download"}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
               </View>
             </Pressable>
           );
         }}
         ListEmptyComponent={
-          <Text style={styles.empty}>{isLoading ? "Loading..." : "No transfers"}</Text>
+          <View style={styles.emptyWrap}>
+            <Ionicons name="swap-horizontal-outline" size={40} color={colors.textMuted} />
+            <Text style={styles.empty}>{isLoading ? "Loading..." : "No transfers yet"}</Text>
+          </View>
         }
-        contentContainerStyle={{ paddingBottom: 100 }}
+        onRefresh={refetch}
+        refreshing={isLoading}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        showsVerticalScrollIndicator={false}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: spacing.md },
+  container: { flex: 1, paddingHorizontal: spacing.md },
+  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md, marginTop: spacing.sm },
+  header: { fontSize: 28, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
+  sendToggle: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   sendSection: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -217,27 +245,39 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
-  sectionTitle: { fontSize: 18, fontWeight: "600", color: colors.text, marginBottom: spacing.sm },
   input: {
     backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: radius.md,
-    padding: 14,
+    padding: 12,
     fontSize: 14,
     marginBottom: 8,
     color: colors.text,
   },
-  inputFocused: { borderColor: colors.inputBorderFocus },
   button: {
     backgroundColor: colors.accent,
     padding: 14,
     borderRadius: radius.md,
     alignItems: "center",
-    marginTop: 4,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 8,
   },
   disabled: { opacity: 0.5 },
   buttonText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  filters: { flexDirection: "row", gap: 8, marginBottom: spacing.md },
+  filterBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  filterActive: { backgroundColor: colors.accentDim, borderColor: colors.accent },
+  filterText: { fontSize: 13, color: colors.textSecondary, fontWeight: "500" },
+  filterTextActive: { color: colors.accent },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -246,22 +286,16 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
   },
-  cardRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  filename: { fontSize: 15, fontWeight: "500", flex: 1, marginRight: 8, color: colors.text },
-  status: { fontSize: 13, fontWeight: "600" },
-  progressTrack: {
-    height: 3,
-    backgroundColor: colors.inputBg,
-    borderRadius: 2,
-    marginBottom: 6,
-    overflow: "hidden",
-  },
+  cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
+  filename: { fontSize: 15, fontWeight: "600", color: colors.text },
+  meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  progressTrack: { height: 3, backgroundColor: colors.inputBg, borderRadius: 2, marginBottom: 8, overflow: "hidden" },
   progressFill: { height: "100%", borderRadius: 2 },
-  meta: { fontSize: 12, color: colors.textSecondary },
-  actionsRow: { flexDirection: "row", justifyContent: "flex-end", gap: 16, marginTop: 8 },
-  actionBtn: { paddingVertical: 4 },
-  downloadText: { color: colors.accent, fontWeight: "600", fontSize: 14 },
-  cancelText: { color: colors.error, fontWeight: "600", fontSize: 14 },
-  disabledText: { opacity: 0.5 },
-  empty: { textAlign: "center", color: colors.textMuted, marginTop: 40 },
+  cardActions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  percent: { fontSize: 12, fontWeight: "600" },
+  cancelText: { color: colors.error, fontWeight: "600", fontSize: 13 },
+  downloadText: { color: colors.accent, fontWeight: "600", fontSize: 13 },
+  emptyWrap: { alignItems: "center", marginTop: 60, gap: 12 },
+  empty: { color: colors.textMuted, fontSize: 14 },
 });
