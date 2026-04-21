@@ -4,6 +4,7 @@ import { api } from "../../../api/client";
 import { readFileAsBuffer, splitIntoChunks, encryptChunks, DEFAULT_CHUNK_SIZE } from "../../../lib/chunker";
 import { generateX25519KeyPair, ecdh, deriveTransferKey, sha256 } from "../../../lib/crypto";
 import { getStoredDeviceId } from "../../../lib/device";
+import { validatePubKey, validateNodeId, validateFileSize } from "../../../lib/validation";
 
 interface UploadState {
   uploading: boolean;
@@ -18,6 +19,11 @@ export function useUpload() {
   });
 
   const upload = async (receiverNodeId: string, receiverPubKeyBase64: string) => {
+    const nodeErr = validateNodeId(receiverNodeId);
+    if (nodeErr) throw new Error(nodeErr);
+    const keyErr = validatePubKey(receiverPubKeyBase64);
+    if (keyErr) throw new Error(keyErr);
+
     setState({ uploading: true, progress: 0, totalChunks: 0, error: null });
 
     try {
@@ -28,6 +34,9 @@ export function useUpload() {
       }
 
       const file = result.assets[0];
+      const sizeErr = validateFileSize(file.size ?? 0);
+      if (sizeErr) throw new Error(sizeErr);
+
       const fileBuffer = await readFileAsBuffer(file.uri);
       const contentHash = sha256(fileBuffer);
       const rawChunks = splitIntoChunks(fileBuffer, DEFAULT_CHUNK_SIZE);

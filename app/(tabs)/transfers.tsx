@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { View, Text, FlatList, Pressable, StyleSheet, TextInput, Alert } from "react-native";
+import { useState, useEffect, useCallback } from "react";
+import { View, Text, FlatList, Pressable, StyleSheet, Alert } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -8,9 +8,12 @@ import { useTransferEvents } from "../../src/features/transfer/hooks/useTransfer
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
 import { useDownload } from "../../src/features/transfer/hooks/useDownload";
 import { Transfer, TransferStatus } from "../../src/features/transfer/types";
+import { Device } from "../../src/features/devices/types";
 import { getStoredDeviceId } from "../../src/lib/device";
 import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
+import DevicePicker from "../../src/components/DevicePicker";
+import { IncomingTransferBanner, useIncomingTransfers } from "../../src/components/IncomingTransferBanner";
 
 const statusColor: Record<string, string> = {
   [TransferStatus.PENDING]: colors.warning,
@@ -39,8 +42,6 @@ export default function TransfersScreen() {
   const router = useRouter();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [showSend, setShowSend] = useState(false);
-  const [receiverNodeId, setReceiverNodeId] = useState("");
-  const [receiverPubKey, setReceiverPubKey] = useState("");
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "done">("all");
   const { data: transfers, isLoading, refetch } = useNodeTransfers(nodeId || "");
@@ -48,7 +49,21 @@ export default function TransfersScreen() {
   const downloadHook = useDownload();
   const cancel = useCancelTransfer();
 
-  useTransferEvents(nodeId);
+  const handleDownload = useCallback((t: Transfer) => {
+    setActiveDownloadId(t.transfer_id);
+    downloadHook
+      .download(t.transfer_id, t.sender_ephemeral_pubkey, t.filename)
+      .then((path) => toast.success(`Saved: ${path.split("/").pop()}`))
+      .catch((e: any) => toast.error(e?.message || "Download failed"))
+      .finally(() => setActiveDownloadId(null));
+  }, [downloadHook]);
+
+  const { incoming, handleEvent, dismiss } = useIncomingTransfers(nodeId, {
+    onDownload: handleDownload,
+    onDismiss: () => {},
+  });
+
+  useTransferEvents(nodeId, { onEvent: handleEvent });
 
   useEffect(() => {
     getStoredDeviceId().then(setNodeId);
@@ -60,29 +75,16 @@ export default function TransfersScreen() {
     return true;
   });
 
-  const handleSend = async () => {
-    if (!receiverNodeId || !receiverPubKey) {
-      toast.error("Receiver node ID and public key required");
-      return;
-    }
+  const handleDeviceSelect = async (device: Device, pubKey: string) => {
     try {
-      const tid = await uploadHook.upload(receiverNodeId, receiverPubKey);
-      toast.success(`Transfer started`);
-      setReceiverNodeId("");
-      setReceiverPubKey("");
-      setShowSend(false);
+      const tid = await uploadHook.upload(device.node_id, pubKey);
+      if (tid) {
+        toast.success("Transfer started");
+        setShowSend(false);
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.error || e?.message || "Send failed");
     }
-  };
-
-  const handleDownload = (t: Transfer) => {
-    setActiveDownloadId(t.transfer_id);
-    downloadHook
-      .download(t.transfer_id, t.sender_ephemeral_pubkey, t.filename)
-      .then((path) => toast.success(`Saved: ${path.split("/").pop()}`))
-      .catch((e) => toast.error(e?.message || "Download failed"))
-      .finally(() => setActiveDownloadId(null));
   };
 
   const handleCancel = (t: Transfer) => {
@@ -115,35 +117,35 @@ export default function TransfersScreen() {
       </View>
 
       {showSend && (
-        <View style={styles.sendSection}>
-          <TextInput
-            style={styles.input}
-            placeholder="Receiver Node ID"
-            placeholderTextColor={colors.textMuted}
-            value={receiverNodeId}
-            onChangeText={setReceiverNodeId}
-            autoCapitalize="none"
+        uploadHook.uploading ? (
+          <View style={styles.sendSection}>
+            <View style={styles.uploadingRow}>
+              <Ionicons name="cloud-upload-outline" size={18} color={colors.accent} />
+              <Text style={styles.uploadingText}>
+                Uploading {uploadHook.progress}/{uploadHook.totalChunks} chunks...
+              </Text>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, {
+                width: `${uploadHook.totalChunks > 0 ? Math.round((uploadHook.progress / uploadHook.totalChunks) * 100) : 0}%`,
+                backgroundColor: colors.accent,
+              }]} />
+            </View>
+          </View>
+        ) : (
+          <DevicePicker
+            currentDeviceId={nodeId}
+            onSelect={handleDeviceSelect}
+            onCancel={() => setShowSend(false)}
           />
-          <TextInput
-            style={styles.input}
-            placeholder="Receiver Public Key (base64)"
-            placeholderTextColor={colors.textMuted}
-            value={receiverPubKey}
-            onChangeText={setReceiverPubKey}
-            autoCapitalize="none"
-          />
-          <Pressable
-            style={[styles.button, uploadHook.uploading && styles.disabled]}
-            onPress={handleSend}
-            disabled={uploadHook.uploading}
-          >
-            <Ionicons name="cloud-upload-outline" size={18} color="#fff" />
-            <Text style={styles.buttonText}>
-              {uploadHook.uploading ? `Uploading ${uploadHook.progress}/${uploadHook.totalChunks}` : "Pick File & Send"}
-            </Text>
-          </Pressable>
-        </View>
+        )
       )}
+
+      <IncomingTransferBanner
+        transfers={incoming}
+        onDownload={handleDownload}
+        onDismiss={dismiss}
+      />
 
       <View style={styles.filters}>
         {(["all", "active", "done"] as const).map((f) => (
@@ -245,27 +247,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
-  input: {
-    backgroundColor: colors.inputBg,
-    borderWidth: 1,
-    borderColor: colors.inputBorder,
-    borderRadius: radius.md,
-    padding: 12,
-    fontSize: 14,
-    marginBottom: 8,
-    color: colors.text,
-  },
-  button: {
-    backgroundColor: colors.accent,
-    padding: 14,
-    borderRadius: radius.md,
-    alignItems: "center",
+  uploadingRow: {
     flexDirection: "row",
-    justifyContent: "center",
+    alignItems: "center",
     gap: 8,
+    marginBottom: 8,
   },
-  disabled: { opacity: 0.5 },
-  buttonText: { color: "#fff", fontSize: 15, fontWeight: "600" },
+  uploadingText: { color: colors.text, fontSize: 14, fontWeight: "600" },
   filters: { flexDirection: "row", gap: 8, marginBottom: spacing.md },
   filterBtn: {
     paddingHorizontal: 14,
