@@ -11,11 +11,17 @@ export default function TabsLayout() {
         sceneStyle: { backgroundColor: colors.bg },
       }}
     >
+      {/* Main dock tabs (visible in dock) */}
       <Tabs.Screen name="index" options={{ title: "Home" }} />
-      <Tabs.Screen name="devices" options={{ title: "Devices" }} />
       <Tabs.Screen name="transfers" options={{ title: "Transfers" }} />
-      <Tabs.Screen name="pairing" options={{ title: "Pair" }} />
-      <Tabs.Screen name="sessions" options={{ title: "Sessions" }} />
+      <Tabs.Screen name="friends" options={{ title: "Friends" }} />
+      <Tabs.Screen name="network" options={{ title: "Network" }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+
+      {/* Hidden tabs (accessible via navigation, not shown in dock) */}
+      <Tabs.Screen name="devices" options={{ title: "Devices", href: null }} />
+      <Tabs.Screen name="pairing" options={{ title: "Pair", href: null }} />
+      <Tabs.Screen name="sessions" options={{ title: "Sessions", href: null }} />
     </Tabs>
   );
 }

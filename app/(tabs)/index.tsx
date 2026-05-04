@@ -33,7 +33,7 @@ function StatCard({ icon, label, value, color, onPress }: {
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const { data: devices, isLoading: devicesLoading, refetch: refetchDevices } = useDevices();
   const { data: sessions, isLoading: sessionsLoading, refetch: refetchSessions } = useSessions();
   const [nodeId, setNodeId] = useState<string | null>(null);
@@ -69,7 +69,7 @@ export default function HomeScreen() {
           <Text style={styles.hello}>Welcome back</Text>
           <Text style={styles.username}>{user?.username || "—"}</Text>
         </View>
-        <Pressable style={styles.avatarCircle} onPress={logout}>
+        <Pressable style={styles.avatarCircle} onPress={() => router.push("/(tabs)/profile")}>
           <Text style={styles.avatarText}>{user?.username?.[0]?.toUpperCase() || "V"}</Text>
         </Pressable>
       </View>
@@ -181,10 +181,25 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <Pressable style={styles.logoutBtn} onPress={logout}>
-        <Ionicons name="log-out-outline" size={18} color={colors.error} />
-        <Text style={styles.logoutText}>Sign Out</Text>
-      </Pressable>
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Manage</Text>
+        </View>
+        <View style={styles.actionsRow}>
+          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/friends")}>
+            <Ionicons name="people" size={20} color={colors.accent} />
+            <Text style={styles.actionLabel}>Friends</Text>
+          </Pressable>
+          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/network")}>
+            <Ionicons name="pulse" size={20} color={colors.warning} />
+            <Text style={styles.actionLabel}>Network</Text>
+          </Pressable>
+          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/devices")}>
+            <Ionicons name="phone-portrait" size={20} color={colors.success} />
+            <Text style={styles.actionLabel}>Devices</Text>
+          </Pressable>
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -306,17 +321,4 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   actionLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: "500" },
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: "rgba(248,113,113,0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(248,113,113,0.15)",
-    borderRadius: radius.md,
-    padding: 14,
-    marginTop: spacing.sm,
-  },
-  logoutText: { color: colors.error, fontWeight: "600", fontSize: 14 },
 });

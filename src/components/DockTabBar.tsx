@@ -5,15 +5,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "../lib/theme";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
-const TABS = [
+const DOCK_TABS = [
   { name: "index", icon: "home-outline", iconActive: "home", label: "Home" },
-  { name: "devices", icon: "phone-portrait-outline", iconActive: "phone-portrait", label: "Devices" },
   { name: "transfers", icon: "swap-horizontal-outline", iconActive: "swap-horizontal", label: "Transfer" },
-  { name: "pairing", icon: "qr-code-outline", iconActive: "qr-code", label: "Pair" },
-  { name: "sessions", icon: "people-outline", iconActive: "people", label: "Sessions" },
+  { name: "friends", icon: "people-outline", iconActive: "people", label: "Friends" },
+  { name: "network", icon: "pulse-outline", iconActive: "pulse", label: "Network" },
+  { name: "profile", icon: "person-outline", iconActive: "person", label: "Profile" },
 ] as const;
 
-type IconName = typeof TABS[number]["icon"] | typeof TABS[number]["iconActive"];
+type IconName = typeof DOCK_TABS[number]["icon"] | typeof DOCK_TABS[number]["iconActive"];
 
 function TabItem({ active, icon, iconActive, onPress }: {
   active: boolean;
@@ -49,24 +49,30 @@ export default function DockTabBar({ state, navigation }: BottomTabBarProps) {
     <View style={[styles.wrapper, { paddingBottom: bottomPad }]}>
       <BlurView intensity={40} tint="dark" style={styles.blur}>
         <View style={styles.innerBorder}>
-          {TABS.map((tab, i) => (
-            <TabItem
-              key={tab.name}
-              active={state.index === i}
-              icon={tab.icon}
-              iconActive={tab.iconActive}
-              onPress={() => {
-                const event = navigation.emit({
-                  type: "tabPress",
-                  target: state.routes[i].key,
-                  canPreventDefault: true,
-                });
-                if (!event.defaultPrevented) {
-                  navigation.navigate(state.routes[i].name);
-                }
-              }}
-            />
-          ))}
+          {DOCK_TABS.map((tab) => {
+            const routeIndex = state.routes.findIndex((r) => r.name === tab.name);
+            const isActive = state.index === routeIndex;
+
+            return (
+              <TabItem
+                key={tab.name}
+                active={isActive}
+                icon={tab.icon}
+                iconActive={tab.iconActive}
+                onPress={() => {
+                  if (routeIndex === -1) return;
+                  const event = navigation.emit({
+                    type: "tabPress",
+                    target: state.routes[routeIndex].key,
+                    canPreventDefault: true,
+                  });
+                  if (!event.defaultPrevented) {
+                    navigation.navigate(state.routes[routeIndex].name);
+                  }
+                }}
+              />
+            );
+          })}
         </View>
       </BlurView>
     </View>

@@ -13,9 +13,12 @@ Feature-based architecture:
 - `src/lib/chunker.ts` — file → Buffer, split into chunks, encrypt each chunk
 - `src/lib/device.ts` — device fingerprint, type detection, SecureStore device ID
 - `src/lib/keyManager.ts` — X25519 key pair lifecycle, ensures key uploaded to server
+- `src/lib/validation.ts` — input validation: X25519 pubkey (base64), node ID (hex/64), file size (max 500MB)
 - `src/components/DockTabBar.tsx` — custom floating glass tab bar with blur, spring animations, Ionicons
+- `src/components/DevicePicker.tsx` — device selector for transfers, fetches approved devices + their public keys
+- `src/components/IncomingTransferBanner.tsx` — SSE-driven incoming transfer notifications with download prompt
 - `src/features/devices/` — types, useDevices, usePairing, useDeviceKeys hooks
-- `src/features/transfer/` — types, useTransfers, useUpload (pick file → chunk → encrypt → upload), useDownload (fetch chunks → decrypt → save)
+- `src/features/transfer/` — types, useTransfers, useUpload (pick file → validate → chunk → encrypt → upload), useDownload (fetch chunks → decrypt → save)
 - `src/features/sessions/` — types, useSessions hooks
 
 ## Key Conventions
