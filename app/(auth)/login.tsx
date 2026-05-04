@@ -73,6 +73,10 @@ export default function LoginScreen() {
           >
             <Text style={styles.buttonText}>{loading ? "Signing in..." : "Sign In"}</Text>
           </Pressable>
+
+          <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
+            <Text style={styles.forgotText}>Forgot password?</Text>
+          </Link>
         </View>
 
         <View style={styles.footer}>
@@ -124,6 +128,8 @@ const styles = StyleSheet.create({
   },
   disabled: { opacity: 0.5 },
   buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+  forgotLink: { alignSelf: "center", marginTop: 12 },
+  forgotText: { color: colors.textSecondary, fontSize: 13, fontWeight: "500" },
   footer: { flexDirection: "row", justifyContent: "center", marginTop: spacing.lg },
   footerText: { color: colors.textSecondary, fontSize: 14 },
   link: { color: colors.accent, fontSize: 14, fontWeight: "600" },
