@@ -7,6 +7,7 @@ import { useNodeTransfers, useCancelTransfer } from "../../src/features/transfer
 import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
 import { useDownload } from "../../src/features/transfer/hooks/useDownload";
+import { useRespondToTransfer } from "../../src/features/friends/hooks/useFriends";
 import { Transfer, TransferStatus } from "../../src/features/transfer/types";
 import { Device } from "../../src/features/devices/types";
 import { getStoredDeviceId } from "../../src/lib/device";
@@ -21,6 +22,7 @@ const statusColor: Record<string, string> = {
   [TransferStatus.COMPLETED]: colors.success,
   [TransferStatus.CANCELLED]: colors.textMuted,
   [TransferStatus.FAILED]: colors.error,
+  [TransferStatus.AWAITING_APPROVAL]: "#60a5fa",
 };
 
 const statusIcon: Record<string, string> = {
@@ -29,6 +31,7 @@ const statusIcon: Record<string, string> = {
   [TransferStatus.COMPLETED]: "checkmark-circle-outline",
   [TransferStatus.CANCELLED]: "close-circle-outline",
   [TransferStatus.FAILED]: "alert-circle-outline",
+  [TransferStatus.AWAITING_APPROVAL]: "hourglass-outline",
 };
 
 function formatSize(bytes: number) {
@@ -43,11 +46,12 @@ export default function TransfersScreen() {
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [showSend, setShowSend] = useState(false);
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "active" | "done">("all");
+  const [filter, setFilter] = useState<"all" | "active" | "incoming" | "done">("all");
   const { data: transfers, isLoading, refetch } = useNodeTransfers(nodeId || "");
   const uploadHook = useUpload();
   const downloadHook = useDownload();
   const cancel = useCancelTransfer();
+  const respondTransfer = useRespondToTransfer();
 
   const handleDownload = useCallback((t: Transfer) => {
     setActiveDownloadId(t.transfer_id);
@@ -69,11 +73,29 @@ export default function TransfersScreen() {
     getStoredDeviceId().then(setNodeId);
   }, []);
 
+  const handleRespond = useCallback((transfer: Transfer, accept: boolean) => {
+    respondTransfer.mutate(
+      { transferId: transfer.transfer_id, receiverNodeId: transfer.receiver_node_id, accept },
+      {
+        onSuccess: () => {
+          toast.success(accept ? "Transfer accepted" : "Transfer rejected");
+          refetch();
+        },
+        onError: () => toast.error("Failed to respond"),
+      }
+    );
+  }, [respondTransfer, refetch]);
+
   const filtered = (transfers || []).filter((t) => {
     if (filter === "active") return t.status === TransferStatus.PENDING || t.status === TransferStatus.IN_PROGRESS;
+    if (filter === "incoming") return t.status === TransferStatus.AWAITING_APPROVAL && t.receiver_node_id === nodeId;
     if (filter === "done") return t.status === TransferStatus.COMPLETED;
     return true;
   });
+
+  const incomingCount = (transfers || []).filter(
+    (t) => t.status === TransferStatus.AWAITING_APPROVAL && t.receiver_node_id === nodeId
+  ).length;
 
   const handleDeviceSelect = async (device: Device, pubKey: string) => {
     try {
@@ -148,11 +170,16 @@ export default function TransfersScreen() {
       />
 
       <View style={styles.filters}>
-        {(["all", "active", "done"] as const).map((f) => (
+        {(["all", "active", "incoming", "done"] as const).map((f) => (
           <Pressable key={f} style={[styles.filterBtn, filter === f && styles.filterActive]} onPress={() => setFilter(f)}>
             <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-              {f === "all" ? "All" : f === "active" ? "Active" : "Completed"}
+              {f === "all" ? "All" : f === "active" ? "Active" : f === "incoming" ? "Incoming" : "Done"}
             </Text>
+            {f === "incoming" && incomingCount > 0 && (
+              <View style={styles.incomingBadge}>
+                <Text style={styles.incomingBadgeText}>{incomingCount}</Text>
+              </View>
+            )}
           </Pressable>
         ))}
       </View>
@@ -194,7 +221,19 @@ export default function TransfersScreen() {
 
               <View style={styles.cardActions}>
                 <Text style={[styles.percent, { color: col }]}>{item.progress_percent}%</Text>
-                <View style={{ flexDirection: "row", gap: 16 }}>
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  {item.status === TransferStatus.AWAITING_APPROVAL && item.receiver_node_id === nodeId && (
+                    <>
+                      <Pressable style={styles.approveBtn} onPress={() => handleRespond(item, true)}>
+                        <Ionicons name="checkmark" size={14} color={colors.success} />
+                        <Text style={styles.approveText}>Accept</Text>
+                      </Pressable>
+                      <Pressable style={styles.rejectBtn} onPress={() => handleRespond(item, false)}>
+                        <Ionicons name="close" size={14} color={colors.error} />
+                        <Text style={styles.rejectText}>Reject</Text>
+                      </Pressable>
+                    </>
+                  )}
                   {canCancel && (
                     <Pressable onPress={() => handleCancel(item)}>
                       <Text style={styles.cancelText}>Cancel</Text>
@@ -284,6 +323,38 @@ const styles = StyleSheet.create({
   percent: { fontSize: 12, fontWeight: "600" },
   cancelText: { color: colors.error, fontWeight: "600", fontSize: 13 },
   downloadText: { color: colors.accent, fontWeight: "600", fontSize: 13 },
+  incomingBadge: {
+    backgroundColor: "#60a5fa",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: radius.pill,
+    marginLeft: 4,
+  },
+  incomingBadgeText: { fontSize: 10, fontWeight: "700", color: "#fff" },
+  approveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    backgroundColor: "rgba(52,211,153,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(52,211,153,0.2)",
+  },
+  approveText: { fontSize: 12, fontWeight: "600", color: colors.success },
+  rejectBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    backgroundColor: "rgba(248,113,113,0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.15)",
+  },
+  rejectText: { fontSize: 12, fontWeight: "600", color: colors.error },
   emptyWrap: { alignItems: "center", marginTop: 60, gap: 12 },
   empty: { color: colors.textMuted, fontSize: 14 },
 });
