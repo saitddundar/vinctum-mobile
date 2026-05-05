@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { File, Paths } from "expo-file-system";
 import { api } from "../../../api/client";
-import { ecdh, deriveTransferKey, decryptAESGCM } from "../../../lib/crypto";
+import { ecdh, deriveTransferKey, deriveWrapKey, unwrapFileKey, decryptAESGCM } from "../../../lib/crypto";
 import { getOrCreateDeviceKeyPair } from "../../../lib/keyManager";
 import { getStoredDeviceId } from "../../../lib/device";
 
@@ -17,14 +17,27 @@ export function useDownload() {
     downloading: false, progress: 0, totalChunks: 0, error: null,
   });
 
-  const download = async (transferId: string, senderEphemeralPubBase64: string, filename: string) => {
+  const download = async (
+    transferId: string,
+    senderEphemeralPubBase64: string,
+    filename: string,
+    wrappedFileKeyBase64?: string,
+  ) => {
     setState({ downloading: true, progress: 0, totalChunks: 0, error: null });
 
     try {
       const { privateKey, publicKey } = await getOrCreateDeviceKeyPair();
       const senderEphemeralPub = Buffer.from(senderEphemeralPubBase64, "base64");
       const sharedSecret = ecdh(privateKey, senderEphemeralPub);
-      const aesKey = deriveTransferKey(sharedSecret, transferId, senderEphemeralPub, publicKey);
+
+      // Group transfer: unwrap the file key. Regular transfer: derive directly.
+      let aesKey: Buffer;
+      if (wrappedFileKeyBase64) {
+        const wrapKey = deriveWrapKey(sharedSecret, senderEphemeralPub, publicKey);
+        aesKey = unwrapFileKey(Buffer.from(wrappedFileKeyBase64, "base64"), wrapKey);
+      } else {
+        aesKey = deriveTransferKey(sharedSecret, transferId, senderEphemeralPub, publicKey);
+      }
 
       const deviceId = await getStoredDeviceId();
       const response = await api.get(`/api/v1/chunks/${transferId}`, {

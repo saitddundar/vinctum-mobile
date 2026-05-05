@@ -18,6 +18,8 @@ export interface Transfer {
   created_at: string;
   sender_ephemeral_pubkey: string;
   content_hash: string;
+  group_transfer_id?: string;
+  wrapped_file_key?: string;
 }
 
 export interface TransferDetail {
@@ -41,6 +43,28 @@ export interface InitiateTransferRequest {
   chunk_size_bytes: number;
   replication_factor: number;
   sender_ephemeral_pubkey: string;
+}
+
+export interface RecipientKey {
+  receiver_node_id: string;
+  wrapped_file_key: string; // base64
+}
+
+export interface InitiateGroupTransferRequest {
+  sender_node_id: string;
+  filename: string;
+  total_size_bytes: number;
+  content_hash: string;
+  chunk_size_bytes: number;
+  sender_ephemeral_pubkey: string;
+  recipient_keys: RecipientKey[];
+}
+
+export interface InitiateGroupTransferResponse {
+  group_transfer_id: string;
+  total_chunks: number;
+  transfers: Transfer[];
+  created_at: string;
 }
 
 export interface TransferEvent {

@@ -77,6 +77,29 @@ export function sha256(data: Buffer): string {
   return hash.digest("hex");
 }
 
+export function generateFileKey(): Buffer {
+  return Buffer.from(QC().randomBytes(32));
+}
+
+export function wrapFileKey(fileKey: Buffer, wrapKey: Buffer): Buffer {
+  return encryptAESGCM(wrapKey, fileKey);
+}
+
+export function unwrapFileKey(wrapped: Buffer, wrapKey: Buffer): Buffer {
+  return decryptAESGCM(wrapKey, wrapped);
+}
+
+export function deriveWrapKey(
+  sharedSecret: Buffer,
+  ephemeralPub: Buffer,
+  receiverStaticPub: Buffer
+): Buffer {
+  const salt = Buffer.concat([ephemeralPub, receiverStaticPub]);
+  const info = Buffer.from("vinctum-group-wrap-v1");
+  const derived = QC().hkdfSync("sha256", sharedSecret, salt, info, 32);
+  return Buffer.from(derived as any);
+}
+
 function buildX25519Pkcs8(raw32: Buffer): Buffer {
   const prefix = Buffer.from("302e020100300506032b656e04220420", "hex");
   return Buffer.concat([prefix, raw32]);

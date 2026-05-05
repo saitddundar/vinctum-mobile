@@ -6,14 +6,17 @@ import { Ionicons } from "@expo/vector-icons";
 import { useNodeTransfers, useCancelTransfer } from "../../src/features/transfer/hooks/useTransfers";
 import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
+import { useSessionTransfer } from "../../src/features/transfer/hooks/useSessionTransfer";
 import { useDownload } from "../../src/features/transfer/hooks/useDownload";
 import { useRespondToTransfer } from "../../src/features/friends/hooks/useFriends";
 import { Transfer, TransferStatus } from "../../src/features/transfer/types";
 import { Device } from "../../src/features/devices/types";
+import { Session } from "../../src/features/sessions/types";
 import { getStoredDeviceId } from "../../src/lib/device";
 import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 import DevicePicker from "../../src/components/DevicePicker";
+import SessionPicker from "../../src/components/SessionPicker";
 import { IncomingTransferBanner, useIncomingTransfers } from "../../src/components/IncomingTransferBanner";
 
 const statusColor: Record<string, string> = {
@@ -45,10 +48,12 @@ export default function TransfersScreen() {
   const router = useRouter();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [showSend, setShowSend] = useState(false);
+  const [sendMode, setSendMode] = useState<"device" | "session">("device");
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "active" | "incoming" | "done">("all");
   const { data: transfers, isLoading, refetch } = useNodeTransfers(nodeId || "");
   const uploadHook = useUpload();
+  const sessionTransferHook = useSessionTransfer();
   const downloadHook = useDownload();
   const cancel = useCancelTransfer();
   const respondTransfer = useRespondToTransfer();
@@ -56,7 +61,7 @@ export default function TransfersScreen() {
   const handleDownload = useCallback((t: Transfer) => {
     setActiveDownloadId(t.transfer_id);
     downloadHook
-      .download(t.transfer_id, t.sender_ephemeral_pubkey, t.filename)
+      .download(t.transfer_id, t.sender_ephemeral_pubkey, t.filename, t.wrapped_file_key)
       .then((path) => toast.success(`Saved: ${path.split("/").pop()}`))
       .catch((e: any) => toast.error(e?.message || "Download failed"))
       .finally(() => setActiveDownloadId(null));
@@ -109,6 +114,21 @@ export default function TransfersScreen() {
     }
   };
 
+  const handleSessionSelect = async (
+    session: Session,
+    deviceKeys: { device_id: string; node_id: string; kex_public_key: string }[]
+  ) => {
+    try {
+      const gid = await sessionTransferHook.upload(session.session_id, deviceKeys);
+      if (gid) {
+        toast.success(`Sent to ${deviceKeys.length} devices`);
+        setShowSend(false);
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Send failed");
+    }
+  };
+
   const handleCancel = (t: Transfer) => {
     Alert.alert("Cancel Transfer", `Cancel "${t.filename}"?`, [
       { text: "Keep" },
@@ -139,27 +159,58 @@ export default function TransfersScreen() {
       </View>
 
       {showSend && (
-        uploadHook.uploading ? (
+        uploadHook.uploading || sessionTransferHook.uploading ? (
           <View style={styles.sendSection}>
             <View style={styles.uploadingRow}>
               <Ionicons name="cloud-upload-outline" size={18} color={colors.accent} />
               <Text style={styles.uploadingText}>
-                Uploading {uploadHook.progress}/{uploadHook.totalChunks} chunks...
+                Uploading {(uploadHook.uploading ? uploadHook.progress : sessionTransferHook.progress)}/
+                {(uploadHook.uploading ? uploadHook.totalChunks : sessionTransferHook.totalChunks)} chunks...
               </Text>
             </View>
             <View style={styles.progressTrack}>
               <View style={[styles.progressFill, {
-                width: `${uploadHook.totalChunks > 0 ? Math.round((uploadHook.progress / uploadHook.totalChunks) * 100) : 0}%`,
+                width: `${(() => {
+                  const p = uploadHook.uploading ? uploadHook.progress : sessionTransferHook.progress;
+                  const t = uploadHook.uploading ? uploadHook.totalChunks : sessionTransferHook.totalChunks;
+                  return t > 0 ? Math.round((p / t) * 100) : 0;
+                })()}%`,
                 backgroundColor: colors.accent,
               }]} />
             </View>
           </View>
         ) : (
-          <DevicePicker
-            currentDeviceId={nodeId}
-            onSelect={handleDeviceSelect}
-            onCancel={() => setShowSend(false)}
-          />
+          <>
+            <View style={styles.sendModeToggle}>
+              <Pressable
+                style={[styles.sendModeBtn, sendMode === "device" && styles.sendModeBtnActive]}
+                onPress={() => setSendMode("device")}
+              >
+                <Ionicons name="phone-portrait-outline" size={14} color={sendMode === "device" ? "#fff" : colors.textSecondary} />
+                <Text style={[styles.sendModeText, sendMode === "device" && styles.sendModeTextActive]}>Device</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.sendModeBtn, sendMode === "session" && styles.sendModeBtnActive]}
+                onPress={() => setSendMode("session")}
+              >
+                <Ionicons name="people-outline" size={14} color={sendMode === "session" ? "#fff" : colors.textSecondary} />
+                <Text style={[styles.sendModeText, sendMode === "session" && styles.sendModeTextActive]}>Session</Text>
+              </Pressable>
+            </View>
+            {sendMode === "device" ? (
+              <DevicePicker
+                currentDeviceId={nodeId}
+                onSelect={handleDeviceSelect}
+                onCancel={() => setShowSend(false)}
+              />
+            ) : (
+              <SessionPicker
+                currentDeviceId={nodeId}
+                onSelect={handleSessionSelect}
+                onCancel={() => setShowSend(false)}
+              />
+            )}
+          </>
         )
       )}
 
@@ -293,6 +344,27 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   uploadingText: { color: colors.text, fontSize: 14, fontWeight: "600" },
+  sendModeToggle: {
+    flexDirection: "row",
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    padding: 3,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  sendModeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+  },
+  sendModeBtnActive: { backgroundColor: colors.accent },
+  sendModeText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
+  sendModeTextActive: { color: "#fff" },
   filters: { flexDirection: "row", gap: 8, marginBottom: spacing.md },
   filterBtn: {
     paddingHorizontal: 14,
