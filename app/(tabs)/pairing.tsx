@@ -3,7 +3,7 @@ import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useGeneratePairingCode, useRedeemPairingCode } from "../../src/features/devices/hooks/usePairing";
-import { getStoredDeviceId } from "../../src/lib/device";
+import { getStoredDeviceId, getOrCreateFingerprint } from "../../src/lib/device";
 import { DeviceType } from "../../src/features/devices/types";
 import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
@@ -87,15 +87,16 @@ function RedeemTab() {
   const [deviceName, setDeviceName] = useState("");
   const redeem = useRedeemPairingCode();
 
-  const handleRedeem = () => {
+  const handleRedeem = async () => {
     if (!pairingCode || !deviceName) return;
+    const fingerprint = await getOrCreateFingerprint();
     redeem.mutate(
       {
         pairing_code: pairingCode,
         name: deviceName,
         device_type: DeviceType.PHONE,
-        fingerprint: `mobile-${Date.now()}`,
-        node_id: `node-${Date.now()}`,
+        fingerprint,
+        node_id: fingerprint.slice(0, 16),
       },
       {
         onSuccess: () => {
