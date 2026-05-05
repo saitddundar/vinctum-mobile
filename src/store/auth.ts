@@ -52,7 +52,9 @@ export const useAuthStore = create<AuthState>((set) => ({
           node_id: fingerprint.slice(0, 16),
         });
         await storeDeviceId(res.data.device.device_id);
-      } catch {}
+      } catch (e: any) {
+        console.warn("Device auto-register failed:", e?.message);
+      }
     }
 
     ensureKeyUploaded().catch(() => {});
