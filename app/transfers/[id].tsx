@@ -13,6 +13,7 @@ const statusLabel: Record<string, string> = {
   [TransferStatus.COMPLETED]: "Completed",
   [TransferStatus.CANCELLED]: "Cancelled",
   [TransferStatus.FAILED]: "Failed",
+  [TransferStatus.AWAITING_APPROVAL]: "Awaiting approval",
 };
 
 const statusColor: Record<string, string> = {
@@ -21,6 +22,7 @@ const statusColor: Record<string, string> = {
   [TransferStatus.COMPLETED]: colors.success,
   [TransferStatus.CANCELLED]: colors.textMuted,
   [TransferStatus.FAILED]: colors.error,
+  [TransferStatus.AWAITING_APPROVAL]: colors.warning,
 };
 
 function fmtBytes(n: number): string {
