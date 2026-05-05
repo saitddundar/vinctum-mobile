@@ -49,8 +49,13 @@ export function useDownload() {
       const uint8 = new Uint8Array(fullFile.buffer, fullFile.byteOffset, fullFile.byteLength);
       const stream = outFile.writableStream();
       const writer = stream.getWriter();
-      await writer.write(uint8);
-      await writer.close();
+      try {
+        await writer.write(uint8);
+        await writer.close();
+      } catch (writeErr) {
+        await writer.abort();
+        throw writeErr;
+      }
 
       setState((s) => ({ ...s, downloading: false }));
       return outFile.uri;

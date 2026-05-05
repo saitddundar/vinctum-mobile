@@ -42,7 +42,10 @@ export default function FriendsScreen() {
     if (!query.trim()) return;
     searchMutation.mutate(query.trim(), {
       onSuccess: (results) => setSearchResults(results),
-      onError: () => toast.error("Search failed"),
+      onError: () => {
+        setSearchResults([]);
+        toast.error("Search failed");
+      },
     });
   }, [query]);
 

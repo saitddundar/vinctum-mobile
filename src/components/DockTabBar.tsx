@@ -1,8 +1,9 @@
-import { View, Pressable, StyleSheet, Platform } from "react-native";
+import { View, Pressable, Text, StyleSheet, Platform } from "react-native";
 import { BlurView } from "expo-blur";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { colors, radius } from "../lib/theme";
+import { useNotificationCount } from "../features/friends/hooks/useFriends";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 
 const DOCK_TABS = [
@@ -15,10 +16,11 @@ const DOCK_TABS = [
 
 type IconName = typeof DOCK_TABS[number]["icon"] | typeof DOCK_TABS[number]["iconActive"];
 
-function TabItem({ active, icon, iconActive, onPress }: {
+function TabItem({ active, icon, iconActive, badge, onPress }: {
   active: boolean;
   icon: IconName;
   iconActive: IconName;
+  badge?: number;
   onPress: () => void;
 }) {
   return (
@@ -35,6 +37,11 @@ function TabItem({ active, icon, iconActive, onPress }: {
           size={22}
           color={active ? colors.accent : colors.textSecondary}
         />
+        {badge != null && badge > 0 && (
+          <View style={styles.badgeDot}>
+            <Text style={styles.badgeText}>{badge > 9 ? "9+" : badge}</Text>
+          </View>
+        )}
       </View>
       {active && <View style={styles.dot} />}
     </Pressable>
@@ -44,6 +51,7 @@ function TabItem({ active, icon, iconActive, onPress }: {
 export default function DockTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomPad = Math.max(insets.bottom, 8);
+  const { data: notifCount } = useNotificationCount();
 
   return (
     <View style={[styles.wrapper, { paddingBottom: bottomPad }]}>
@@ -52,6 +60,9 @@ export default function DockTabBar({ state, navigation }: BottomTabBarProps) {
           {DOCK_TABS.map((tab) => {
             const routeIndex = state.routes.findIndex((r) => r.name === tab.name);
             const isActive = state.index === routeIndex;
+            const badge = tab.name === "friends" ? notifCount?.friend_requests
+              : tab.name === "transfers" ? notifCount?.incoming_transfers
+              : undefined;
 
             return (
               <TabItem
@@ -59,6 +70,7 @@ export default function DockTabBar({ state, navigation }: BottomTabBarProps) {
                 active={isActive}
                 icon={tab.icon}
                 iconActive={tab.iconActive}
+                badge={badge}
                 onPress={() => {
                   if (routeIndex === -1) return;
                   const event = navigation.emit({
@@ -136,5 +148,22 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: colors.accent,
     marginTop: 4,
+  },
+  badgeDot: {
+    position: "absolute",
+    top: 2,
+    right: 2,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.error,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#fff",
   },
 });
