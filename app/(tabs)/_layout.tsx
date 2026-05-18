@@ -22,6 +22,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="devices" options={{ title: "Devices", href: null }} />
       <Tabs.Screen name="pairing" options={{ title: "Pair", href: null }} />
       <Tabs.Screen name="sessions" options={{ title: "Sessions", href: null }} />
+      <Tabs.Screen name="settings" options={{ title: "Settings", href: null }} />
     </Tabs>
   );
 }

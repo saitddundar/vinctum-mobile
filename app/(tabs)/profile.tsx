@@ -9,6 +9,7 @@ import {
   Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Clipboard from "expo-clipboard";
 import { useAuthStore } from "../../src/store/auth";
@@ -20,6 +21,7 @@ type Tab = "profile" | "security";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const { user, logout } = useAuthStore();
   const [tab, setTab] = useState<Tab>("profile");
 
@@ -77,6 +79,13 @@ export default function ProfileScreen() {
       ) : (
         <SecurityTab />
       )}
+
+      {/* Settings */}
+      <Pressable style={styles.settingsBtn} onPress={() => router.push("/(tabs)/settings")}>
+        <Ionicons name="settings-outline" size={18} color={colors.accent} />
+        <Text style={styles.settingsText}>Settings</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.textMuted} style={{ marginLeft: "auto" }} />
+      </Pressable>
 
       {/* Sign Out */}
       <Pressable style={styles.logoutBtn} onPress={handleLogout}>
@@ -401,6 +410,19 @@ const styles = StyleSheet.create({
   },
   changeBtnText: { color: "#fff", fontSize: 15, fontWeight: "600" },
   disabled: { opacity: 0.5 },
+
+  settingsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    borderRadius: radius.md,
+    padding: 14,
+    marginTop: spacing.md,
+  },
+  settingsText: { color: colors.accent, fontWeight: "600", fontSize: 14 },
 
   logoutBtn: {
     flexDirection: "row",
