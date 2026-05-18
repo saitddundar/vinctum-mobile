@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { AppState, View } from "react-native";
 import { Slot, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -8,6 +8,8 @@ import { useAuthStore } from "../src/store/auth";
 import { Toast } from "../src/components/Toast";
 import { OfflineBanner } from "../src/components/OfflineBanner";
 import { useNotificationListener, registerForPushNotifications } from "../src/lib/notifications";
+import { useBiometricStore } from "../src/store/biometric";
+import { LockScreen } from "../src/components/LockScreen";
 import { colors } from "../src/lib/theme";
 
 const queryClient = new QueryClient();
@@ -18,10 +20,14 @@ function AuthGate() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
+  const { load: loadBiometric, lock } = useBiometricStore();
+  const appState = useRef(AppState.currentState);
+
   useNotificationListener();
 
   useEffect(() => {
     loadTokens().then(() => setReady(true));
+    loadBiometric();
   }, []);
 
   useEffect(() => {
@@ -29,6 +35,16 @@ function AuthGate() {
       registerForPushNotifications();
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (appState.current === "active" && next.match(/inactive|background/)) {
+        lock();
+      }
+      appState.current = next;
+    });
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -56,6 +72,7 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <OfflineBanner />
         <AuthGate />
+        <LockScreen />
         <Toast />
       </QueryClientProvider>
     </SafeAreaProvider>
