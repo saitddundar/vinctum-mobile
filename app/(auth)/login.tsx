@@ -1,6 +1,15 @@
 import { useState } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, KeyboardAvoidingView, Platform } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { Link } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../src/store/auth";
 import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
@@ -30,59 +39,63 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.inner}>
-        <View style={styles.header}>
-          <Text style={styles.brand}>V</Text>
-          <Text style={styles.title}>Vinctum</Text>
-          <Text style={styles.subtitle}>Sign in to your account</Text>
+        {/* Logo */}
+        <View style={styles.logoWrap}>
+          <View style={styles.logoBox}>
+            <Ionicons name="shield-checkmark" size={28} color={colors.bg} />
+          </View>
         </View>
 
-        <View style={styles.form}>
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Email</Text>
-            <TextInput
-              style={[styles.input, focused === "email" && styles.inputFocused]}
-              placeholder="you@example.com"
-              placeholderTextColor={colors.textMuted}
-              value={email}
-              onChangeText={setEmail}
-              autoCapitalize="none"
-              keyboardType="email-address"
-              onFocus={() => setFocused("email")}
-              onBlur={() => setFocused(null)}
-            />
-          </View>
+        {/* Heading */}
+        <Text style={styles.title}>Welcome back</Text>
+        <Text style={styles.subtitle}>Sign in to continue</Text>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Password</Text>
-            <TextInput
-              style={[styles.input, focused === "password" && styles.inputFocused]}
-              placeholder="••••••••"
-              placeholderTextColor={colors.textMuted}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              onFocus={() => setFocused("password")}
-              onBlur={() => setFocused(null)}
-            />
-          </View>
+        {/* Form */}
+        <View style={styles.form}>
+          <TextInput
+            style={[styles.input, focused === "email" && styles.inputFocused]}
+            placeholder="Email"
+            placeholderTextColor={colors.textSecondary}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            onFocus={() => setFocused("email")}
+            onBlur={() => setFocused(null)}
+          />
+
+          <TextInput
+            style={[styles.input, focused === "password" && styles.inputFocused]}
+            placeholder="Password"
+            placeholderTextColor={colors.textSecondary}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            onFocus={() => setFocused("password")}
+            onBlur={() => setFocused(null)}
+          />
 
           <Pressable
-            style={[styles.button, loading && styles.disabled]}
+            style={[styles.primaryBtn, loading && styles.disabled]}
             onPress={handleLogin}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>{loading ? "Signing in..." : "Sign In"}</Text>
+            <Text style={styles.primaryBtnText}>
+              {loading ? "Signing in..." : "Sign in"}
+            </Text>
           </Pressable>
 
-          <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
-            <Text style={styles.forgotText}>Forgot password?</Text>
+          <Link href="/(auth)/register" asChild>
+            <Pressable style={styles.secondaryBtn}>
+              <Text style={styles.secondaryBtnText}>Create account</Text>
+            </Pressable>
           </Link>
         </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>Don't have an account? </Text>
-          <Link href="/(auth)/register" style={styles.link}>Sign up</Link>
-        </View>
+        {/* Forgot password */}
+        <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
+          <Text style={styles.forgotText}>Forgot password?</Text>
+        </Link>
       </View>
     </KeyboardAvoidingView>
   );
@@ -90,47 +103,63 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  inner: { flex: 1, justifyContent: "center", padding: spacing.lg },
-  header: { alignItems: "center", marginBottom: spacing.xxl },
-  brand: {
-    width: 56, height: 56, borderRadius: 16,
-    backgroundColor: colors.accent, color: "#fff",
-    fontSize: 28, fontWeight: "800", textAlign: "center", lineHeight: 56,
-    overflow: "hidden", marginBottom: spacing.md,
+  inner: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.lg,
   },
-  title: { fontSize: 28, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
-  subtitle: { fontSize: 15, color: colors.textSecondary, marginTop: 6 },
-  form: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1,
-    borderColor: colors.glassBorder,
-    padding: spacing.lg,
+  logoWrap: { marginBottom: spacing.lg },
+  logoBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  inputGroup: { marginBottom: spacing.md },
-  label: { fontSize: 13, fontWeight: "500", color: colors.textSecondary, marginBottom: 6 },
+  title: {
+    fontSize: 26,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.5,
+    marginBottom: 6,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    marginBottom: spacing.xl,
+  },
+  form: { width: "100%", gap: spacing.sm },
   input: {
     backgroundColor: colors.inputBg,
     borderWidth: 1,
     borderColor: colors.inputBorder,
     borderRadius: radius.md,
-    padding: 14,
-    fontSize: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
     color: colors.text,
   },
   inputFocused: { borderColor: colors.inputBorderFocus },
-  button: {
+  primaryBtn: {
     backgroundColor: colors.accent,
-    padding: 16,
+    paddingVertical: 15,
     borderRadius: radius.md,
     alignItems: "center",
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
+  primaryBtnText: { color: colors.bg, fontSize: 15, fontWeight: "700" },
+  secondaryBtn: {
+    backgroundColor: "transparent",
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  secondaryBtnText: { color: colors.text, fontSize: 15, fontWeight: "500" },
   disabled: { opacity: 0.5 },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "700" },
-  forgotLink: { alignSelf: "center", marginTop: 12 },
-  forgotText: { color: colors.textSecondary, fontSize: 13, fontWeight: "500" },
-  footer: { flexDirection: "row", justifyContent: "center", marginTop: spacing.lg },
-  footerText: { color: colors.textSecondary, fontSize: 14 },
-  link: { color: colors.accent, fontSize: 14, fontWeight: "600" },
+  forgotLink: { marginTop: spacing.lg },
+  forgotText: { color: colors.textSecondary, fontSize: 13 },
 });
