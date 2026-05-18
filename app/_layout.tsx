@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuthStore } from "../src/store/auth";
 import { Toast } from "../src/components/Toast";
 import { OfflineBanner } from "../src/components/OfflineBanner";
+import { useNotificationListener, registerForPushNotifications } from "../src/lib/notifications";
 import { colors } from "../src/lib/theme";
 
 const queryClient = new QueryClient();
@@ -17,9 +18,17 @@ function AuthGate() {
   const router = useRouter();
   const [ready, setReady] = useState(false);
 
+  useNotificationListener();
+
   useEffect(() => {
     loadTokens().then(() => setReady(true));
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      registerForPushNotifications();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (!ready) return;
