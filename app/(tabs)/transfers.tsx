@@ -1,9 +1,19 @@
 import { useState, useEffect, useCallback } from "react";
-import { View, Text, FlatList, Pressable, StyleSheet, Alert } from "react-native";
+import {
+  View,
+  Text,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Alert,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNodeTransfers, useCancelTransfer } from "../../src/features/transfer/hooks/useTransfers";
+import {
+  useNodeTransfers,
+  useCancelTransfer,
+} from "../../src/features/transfer/hooks/useTransfers";
 import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
 import { useSessionTransfer } from "../../src/features/transfer/hooks/useSessionTransfer";
@@ -17,7 +27,10 @@ import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 import DevicePicker from "../../src/components/DevicePicker";
 import SessionPicker from "../../src/components/SessionPicker";
-import { IncomingTransferBanner, useIncomingTransfers } from "../../src/components/IncomingTransferBanner";
+import {
+  IncomingTransferBanner,
+  useIncomingTransfers,
+} from "../../src/components/IncomingTransferBanner";
 
 const statusColor: Record<string, string> = {
   [TransferStatus.PENDING]: colors.warning,
@@ -25,23 +38,18 @@ const statusColor: Record<string, string> = {
   [TransferStatus.COMPLETED]: colors.success,
   [TransferStatus.CANCELLED]: colors.textMuted,
   [TransferStatus.FAILED]: colors.error,
-  [TransferStatus.AWAITING_APPROVAL]: "#60a5fa",
-};
-
-const statusIcon: Record<string, string> = {
-  [TransferStatus.PENDING]: "time-outline",
-  [TransferStatus.IN_PROGRESS]: "arrow-up-circle-outline",
-  [TransferStatus.COMPLETED]: "checkmark-circle-outline",
-  [TransferStatus.CANCELLED]: "close-circle-outline",
-  [TransferStatus.FAILED]: "alert-circle-outline",
-  [TransferStatus.AWAITING_APPROVAL]: "hourglass-outline",
+  [TransferStatus.AWAITING_APPROVAL]: colors.blue,
 };
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
+
+type FilterType = "all" | "active" | "done";
 
 export default function TransfersScreen() {
   const insets = useSafeAreaInsets();
@@ -50,7 +58,7 @@ export default function TransfersScreen() {
   const [showSend, setShowSend] = useState(false);
   const [sendMode, setSendMode] = useState<"device" | "session">("device");
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "active" | "incoming" | "done">("all");
+  const [filter, setFilter] = useState<FilterType>("all");
   const { data: transfers, isLoading, refetch } = useNodeTransfers(nodeId || "");
   const uploadHook = useUpload();
   const sessionTransferHook = useSessionTransfer();
@@ -58,14 +66,22 @@ export default function TransfersScreen() {
   const cancel = useCancelTransfer();
   const respondTransfer = useRespondToTransfer();
 
-  const handleDownload = useCallback((t: Transfer) => {
-    setActiveDownloadId(t.transfer_id);
-    downloadHook
-      .download(t.transfer_id, t.sender_ephemeral_pubkey, t.filename, t.wrapped_file_key)
-      .then((path) => toast.success(`Saved: ${path.split("/").pop()}`))
-      .catch((e: any) => toast.error(e?.message || "Download failed"))
-      .finally(() => setActiveDownloadId(null));
-  }, [downloadHook]);
+  const handleDownload = useCallback(
+    (t: Transfer) => {
+      setActiveDownloadId(t.transfer_id);
+      downloadHook
+        .download(
+          t.transfer_id,
+          t.sender_ephemeral_pubkey,
+          t.filename,
+          t.wrapped_file_key
+        )
+        .then((path) => toast.success(`Saved: ${path.split("/").pop()}`))
+        .catch((e: any) => toast.error(e?.message || "Download failed"))
+        .finally(() => setActiveDownloadId(null));
+    },
+    [downloadHook]
+  );
 
   const { incoming, handleEvent, dismiss } = useIncomingTransfers(nodeId, {
     onDownload: handleDownload,
@@ -78,28 +94,40 @@ export default function TransfersScreen() {
     getStoredDeviceId().then(setNodeId);
   }, []);
 
-  const handleRespond = useCallback((transfer: Transfer, accept: boolean) => {
-    respondTransfer.mutate(
-      { transferId: transfer.transfer_id, receiverNodeId: transfer.receiver_node_id, accept },
-      {
-        onSuccess: () => {
-          toast.success(accept ? "Transfer accepted" : "Transfer rejected");
-          refetch();
+  const handleRespond = useCallback(
+    (transfer: Transfer, accept: boolean) => {
+      respondTransfer.mutate(
+        {
+          transferId: transfer.transfer_id,
+          receiverNodeId: transfer.receiver_node_id,
+          accept,
         },
-        onError: () => toast.error("Failed to respond"),
-      }
-    );
-  }, [respondTransfer, refetch]);
+        {
+          onSuccess: () => {
+            toast.success(accept ? "Transfer accepted" : "Transfer rejected");
+            refetch();
+          },
+          onError: () => toast.error("Failed to respond"),
+        }
+      );
+    },
+    [respondTransfer, refetch]
+  );
 
   const filtered = (transfers || []).filter((t) => {
-    if (filter === "active") return t.status === TransferStatus.PENDING || t.status === TransferStatus.IN_PROGRESS;
-    if (filter === "incoming") return t.status === TransferStatus.AWAITING_APPROVAL && t.receiver_node_id === nodeId;
+    if (filter === "active")
+      return (
+        t.status === TransferStatus.PENDING ||
+        t.status === TransferStatus.IN_PROGRESS
+      );
     if (filter === "done") return t.status === TransferStatus.COMPLETED;
     return true;
   });
 
-  const incomingCount = (transfers || []).filter(
-    (t) => t.status === TransferStatus.AWAITING_APPROVAL && t.receiver_node_id === nodeId
+  const activeCount = (transfers || []).filter(
+    (t) =>
+      t.status === TransferStatus.PENDING ||
+      t.status === TransferStatus.IN_PROGRESS
   ).length;
 
   const handleDeviceSelect = async (device: Device, pubKey: string) => {
@@ -116,10 +144,17 @@ export default function TransfersScreen() {
 
   const handleSessionSelect = async (
     session: Session,
-    deviceKeys: { device_id: string; node_id: string; kex_public_key: string }[]
+    deviceKeys: {
+      device_id: string;
+      node_id: string;
+      kex_public_key: string;
+    }[]
   ) => {
     try {
-      const gid = await sessionTransferHook.upload(session.session_id, deviceKeys);
+      const gid = await sessionTransferHook.upload(
+        session.session_id,
+        deviceKeys
+      );
       if (gid) {
         toast.success(`Sent to ${deviceKeys.length} devices`);
         setShowSend(false);
@@ -140,61 +175,103 @@ export default function TransfersScreen() {
             { transferId: t.transfer_id, reason: "user cancelled" },
             {
               onSuccess: () => toast.success("Transfer cancelled"),
-              onError: (e: any) => toast.error(e?.response?.data?.error || "Cancel failed"),
+              onError: (e: any) =>
+                toast.error(e?.response?.data?.error || "Cancel failed"),
             }
           ),
       },
     ]);
   };
 
-  const isDownloading = (id: string) => activeDownloadId === id && downloadHook.downloading;
+  const isDownloading = (id: string) =>
+    activeDownloadId === id && downloadHook.downloading;
+
+  const filters: { key: FilterType; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "active", label: "Active" },
+    { key: "done", label: "Done" },
+  ];
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
+      {/* Header */}
       <View style={styles.topRow}>
-        <Text style={styles.header}>Transfers</Text>
-        <Pressable style={styles.sendToggle} onPress={() => setShowSend(!showSend)}>
-          <Ionicons name={showSend ? "close" : "add"} size={20} color="#fff" />
+        <View>
+          <Text style={styles.header}>Transfers</Text>
+          <Text style={styles.headerSub}>
+            {activeCount} active · {(transfers || []).length} today
+          </Text>
+        </View>
+        <Pressable
+          style={styles.sendBtn}
+          onPress={() => setShowSend(!showSend)}
+        >
+          <Ionicons
+            name={showSend ? "close" : "paper-plane-outline"}
+            size={16}
+            color={colors.bg}
+          />
+          <Text style={styles.sendBtnText}>{showSend ? "Close" : "Send"}</Text>
         </Pressable>
       </View>
 
-      {showSend && (
-        uploadHook.uploading || sessionTransferHook.uploading ? (
+      {/* Send panel */}
+      {showSend &&
+        (uploadHook.uploading || sessionTransferHook.uploading ? (
           <View style={styles.sendSection}>
             <View style={styles.uploadingRow}>
-              <Ionicons name="cloud-upload-outline" size={18} color={colors.accent} />
+              <Ionicons
+                name="cloud-upload-outline"
+                size={16}
+                color={colors.accent}
+              />
               <Text style={styles.uploadingText}>
-                Uploading {(uploadHook.uploading ? uploadHook.progress : sessionTransferHook.progress)}/
-                {(uploadHook.uploading ? uploadHook.totalChunks : sessionTransferHook.totalChunks)} chunks...
+                Uploading{" "}
+                {uploadHook.uploading
+                  ? uploadHook.progress
+                  : sessionTransferHook.progress}
+                /
+                {uploadHook.uploading
+                  ? uploadHook.totalChunks
+                  : sessionTransferHook.totalChunks}{" "}
+                chunks...
               </Text>
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, {
-                width: `${(() => {
-                  const p = uploadHook.uploading ? uploadHook.progress : sessionTransferHook.progress;
-                  const t = uploadHook.uploading ? uploadHook.totalChunks : sessionTransferHook.totalChunks;
-                  return t > 0 ? Math.round((p / t) * 100) : 0;
-                })()}%`,
-                backgroundColor: colors.accent,
-              }]} />
             </View>
           </View>
         ) : (
           <>
             <View style={styles.sendModeToggle}>
               <Pressable
-                style={[styles.sendModeBtn, sendMode === "device" && styles.sendModeBtnActive]}
+                style={[
+                  styles.sendModeBtn,
+                  sendMode === "device" && styles.sendModeBtnActive,
+                ]}
                 onPress={() => setSendMode("device")}
               >
-                <Ionicons name="phone-portrait-outline" size={14} color={sendMode === "device" ? "#fff" : colors.textSecondary} />
-                <Text style={[styles.sendModeText, sendMode === "device" && styles.sendModeTextActive]}>Device</Text>
+                <Text
+                  style={[
+                    styles.sendModeText,
+                    sendMode === "device" && styles.sendModeTextActive,
+                  ]}
+                >
+                  Device
+                </Text>
               </Pressable>
               <Pressable
-                style={[styles.sendModeBtn, sendMode === "session" && styles.sendModeBtnActive]}
+                style={[
+                  styles.sendModeBtn,
+                  sendMode === "session" && styles.sendModeBtnActive,
+                ]}
                 onPress={() => setSendMode("session")}
               >
-                <Ionicons name="people-outline" size={14} color={sendMode === "session" ? "#fff" : colors.textSecondary} />
-                <Text style={[styles.sendModeText, sendMode === "session" && styles.sendModeTextActive]}>Session</Text>
+                <Text
+                  style={[
+                    styles.sendModeText,
+                    sendMode === "session" && styles.sendModeTextActive,
+                  ]}
+                >
+                  Session
+                </Text>
               </Pressable>
             </View>
             {sendMode === "device" ? (
@@ -211,8 +288,7 @@ export default function TransfersScreen() {
               />
             )}
           </>
-        )
-      )}
+        ))}
 
       <IncomingTransferBanner
         transfers={incoming}
@@ -220,92 +296,172 @@ export default function TransfersScreen() {
         onDismiss={dismiss}
       />
 
+      {/* Filters */}
       <View style={styles.filters}>
-        {(["all", "active", "incoming", "done"] as const).map((f) => (
-          <Pressable key={f} style={[styles.filterBtn, filter === f && styles.filterActive]} onPress={() => setFilter(f)}>
-            <Text style={[styles.filterText, filter === f && styles.filterTextActive]}>
-              {f === "all" ? "All" : f === "active" ? "Active" : f === "incoming" ? "Incoming" : "Done"}
+        {filters.map((f) => (
+          <Pressable
+            key={f.key}
+            style={[styles.filterBtn, filter === f.key && styles.filterActive]}
+            onPress={() => setFilter(f.key)}
+          >
+            <Text
+              style={[
+                styles.filterText,
+                filter === f.key && styles.filterTextActive,
+              ]}
+            >
+              {f.label}
             </Text>
-            {f === "incoming" && incomingCount > 0 && (
-              <View style={styles.incomingBadge}>
-                <Text style={styles.incomingBadgeText}>{incomingCount}</Text>
-              </View>
-            )}
           </Pressable>
         ))}
       </View>
 
+      {/* List */}
       <FlatList
         data={filtered}
         keyExtractor={(t) => t.transfer_id}
         renderItem={({ item }) => {
           const downloading = isDownloading(item.transfer_id);
-          const canCancel = item.status === TransferStatus.PENDING || item.status === TransferStatus.IN_PROGRESS;
-          const canDownload = item.status === TransferStatus.COMPLETED && item.receiver_node_id === nodeId;
+          const canCancel =
+            item.status === TransferStatus.PENDING ||
+            item.status === TransferStatus.IN_PROGRESS;
+          const canDownload =
+            item.status === TransferStatus.COMPLETED &&
+            item.receiver_node_id === nodeId;
           const col = statusColor[item.status] || colors.accent;
+          const isActive =
+            item.status === TransferStatus.IN_PROGRESS ||
+            item.status === TransferStatus.PENDING;
 
           return (
-            <Pressable style={styles.card} onPress={() => router.push(`/transfers/${item.transfer_id}`)}>
-              <View style={styles.cardTop}>
-                <View style={[styles.statusDot, { backgroundColor: col }]} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.filename} numberOfLines={1}>{item.filename}</Text>
-                  <Text style={styles.meta}>{formatSize(item.total_size_bytes)}</Text>
+            <Pressable
+              style={styles.card}
+              onPress={() => router.push(`/transfers/${item.transfer_id}`)}
+            >
+              <View style={styles.cardRow}>
+                {/* Status icon */}
+                <View style={[styles.statusIconWrap, { backgroundColor: col + "18" }]}>
+                  <Ionicons
+                    name={
+                      item.status === TransferStatus.COMPLETED
+                        ? "checkmark"
+                        : item.status === TransferStatus.IN_PROGRESS ||
+                          item.status === TransferStatus.PENDING
+                        ? "paper-plane-outline"
+                        : "close"
+                    }
+                    size={14}
+                    color={col}
+                  />
                 </View>
-                <Ionicons name={statusIcon[item.status] as any} size={20} color={col} />
-              </View>
 
-              {(item.status === TransferStatus.IN_PROGRESS || item.status === TransferStatus.PENDING) && (
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, { width: `${item.progress_percent}%`, backgroundColor: col }]} />
+                {/* File info */}
+                <View style={styles.cardInfo}>
+                  <Text style={styles.filename} numberOfLines={1}>
+                    {item.filename}
+                  </Text>
+                  <Text style={styles.meta}>
+                    {formatSize(item.total_size_bytes)}
+                    {isActive && (
+                      <Text style={[styles.metaSpeed, { color: colors.accent }]}>
+                        {"  "}
+                        {((item.total_size_bytes / (1024 * 1024)) * 0.02).toFixed(0)} MB/s
+                      </Text>
+                    )}
+                    {item.status === TransferStatus.COMPLETED && (
+                      <Text style={styles.metaTime}>
+                        {"  "}
+                        {new Date(item.created_at || "").toLocaleTimeString(
+                          [],
+                          { hour: "2-digit", minute: "2-digit" }
+                        )}
+                      </Text>
+                    )}
+                  </Text>
                 </View>
-              )}
 
-              {downloading && (
-                <View style={styles.progressTrack}>
-                  <View style={[styles.progressFill, {
-                    width: `${downloadHook.totalChunks > 0 ? Math.round((downloadHook.progress / downloadHook.totalChunks) * 100) : 0}%`,
-                    backgroundColor: colors.accent,
-                  }]} />
-                </View>
-              )}
-
-              <View style={styles.cardActions}>
-                <Text style={[styles.percent, { color: col }]}>{item.progress_percent}%</Text>
-                <View style={{ flexDirection: "row", gap: 12 }}>
-                  {item.status === TransferStatus.AWAITING_APPROVAL && item.receiver_node_id === nodeId && (
-                    <>
-                      <Pressable style={styles.approveBtn} onPress={() => handleRespond(item, true)}>
-                        <Ionicons name="checkmark" size={14} color={colors.success} />
-                        <Text style={styles.approveText}>Accept</Text>
-                      </Pressable>
-                      <Pressable style={styles.rejectBtn} onPress={() => handleRespond(item, false)}>
-                        <Ionicons name="close" size={14} color={colors.error} />
-                        <Text style={styles.rejectText}>Reject</Text>
-                      </Pressable>
-                    </>
-                  )}
-                  {canCancel && (
-                    <Pressable onPress={() => handleCancel(item)}>
-                      <Text style={styles.cancelText}>Cancel</Text>
-                    </Pressable>
+                {/* Right side */}
+                <View style={styles.cardRight}>
+                  {isActive && (
+                    <Text style={[styles.percent, { color: col }]}>
+                      {item.progress_percent}%
+                    </Text>
                   )}
                   {canDownload && (
-                    <Pressable onPress={() => handleDownload(item)} disabled={downloading}>
-                      <Text style={[styles.downloadText, downloading && { opacity: 0.5 }]}>
-                        {downloading ? "Downloading..." : "Download"}
+                    <Pressable
+                      onPress={() => handleDownload(item)}
+                      disabled={downloading}
+                    >
+                      <Text
+                        style={[
+                          styles.actionText,
+                          { color: colors.accent },
+                          downloading && { opacity: 0.5 },
+                        ]}
+                      >
+                        {downloading ? "..." : "↓"}
                       </Text>
                     </Pressable>
                   )}
                 </View>
               </View>
+
+              {/* Progress bar */}
+              {isActive && (
+                <View style={styles.progressTrack}>
+                  <View
+                    style={[
+                      styles.progressFill,
+                      {
+                        width: `${item.progress_percent}%` as any,
+                        backgroundColor: col,
+                      },
+                    ]}
+                  />
+                </View>
+              )}
+
+              {/* Awaiting approval actions */}
+              {item.status === TransferStatus.AWAITING_APPROVAL &&
+                item.receiver_node_id === nodeId && (
+                  <View style={styles.awaitingActions}>
+                    <Pressable
+                      style={styles.rejectBtn}
+                      onPress={() => handleRespond(item, false)}
+                    >
+                      <Text style={styles.rejectText}>Reject</Text>
+                    </Pressable>
+                    <Pressable
+                      style={styles.approveBtn}
+                      onPress={() => handleRespond(item, true)}
+                    >
+                      <Text style={styles.approveText}>Accept</Text>
+                    </Pressable>
+                  </View>
+                )}
+
+              {/* Cancel */}
+              {canCancel && (
+                <Pressable
+                  style={styles.cancelRow}
+                  onPress={() => handleCancel(item)}
+                >
+                  <Text style={styles.cancelText}>Cancel transfer</Text>
+                </Pressable>
+              )}
             </Pressable>
           );
         }}
         ListEmptyComponent={
           <View style={styles.emptyWrap}>
-            <Ionicons name="swap-horizontal-outline" size={40} color={colors.textMuted} />
-            <Text style={styles.empty}>{isLoading ? "Loading..." : "No transfers yet"}</Text>
+            <Ionicons
+              name="swap-horizontal-outline"
+              size={40}
+              color={colors.textMuted}
+            />
+            <Text style={styles.empty}>
+              {isLoading ? "Loading..." : "No transfers yet"}
+            </Text>
           </View>
         }
         onRefresh={refetch}
@@ -318,17 +474,32 @@ export default function TransfersScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: spacing.md },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md, marginTop: spacing.sm },
-  header: { fontSize: 28, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
-  sendToggle: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: colors.accent,
+  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.md },
+  topRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    justifyContent: "center",
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
   },
+  header: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
+  headerSub: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  sendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: colors.accent,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+  },
+  sendBtnText: { color: colors.bg, fontSize: 14, fontWeight: "700" },
+
   sendSection: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -341,7 +512,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginBottom: 8,
   },
   uploadingText: { color: colors.text, fontSize: 14, fontWeight: "600" },
   sendModeToggle: {
@@ -355,28 +525,35 @@ const styles = StyleSheet.create({
   },
   sendModeBtn: {
     flex: 1,
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 6,
     paddingVertical: 8,
     borderRadius: radius.sm,
   },
   sendModeBtnActive: { backgroundColor: colors.accent },
   sendModeText: { fontSize: 13, fontWeight: "600", color: colors.textSecondary },
-  sendModeTextActive: { color: "#fff" },
-  filters: { flexDirection: "row", gap: 8, marginBottom: spacing.md },
+  sendModeTextActive: { color: colors.bg },
+
+  filters: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: spacing.md,
+  },
   filterBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.glassBorder,
   },
-  filterActive: { backgroundColor: colors.accentDim, borderColor: colors.accent },
+  filterActive: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
   filterText: { fontSize: 13, color: colors.textSecondary, fontWeight: "500" },
-  filterTextActive: { color: colors.accent },
+  filterTextActive: { color: colors.bg, fontWeight: "700" },
+
   card: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -385,48 +562,64 @@ const styles = StyleSheet.create({
     padding: 14,
     marginBottom: 10,
   },
-  cardTop: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-  statusDot: { width: 8, height: 8, borderRadius: 4, marginRight: 10 },
-  filename: { fontSize: 15, fontWeight: "600", color: colors.text },
+  cardRow: { flexDirection: "row", alignItems: "center" },
+  statusIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  cardInfo: { flex: 1 },
+  filename: { fontSize: 14, fontWeight: "600", color: colors.text },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  progressTrack: { height: 3, backgroundColor: colors.inputBg, borderRadius: 2, marginBottom: 8, overflow: "hidden" },
+  metaSpeed: { fontWeight: "600" },
+  metaTime: { color: colors.textMuted },
+  cardRight: { alignItems: "flex-end", marginLeft: 8 },
+  percent: { fontSize: 13, fontWeight: "700" },
+  actionText: { fontSize: 16, fontWeight: "700" },
+  progressTrack: {
+    height: 3,
+    backgroundColor: colors.inputBg,
+    borderRadius: 2,
+    marginTop: 10,
+    overflow: "hidden",
+  },
   progressFill: { height: "100%", borderRadius: 2 },
-  cardActions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  percent: { fontSize: 12, fontWeight: "600" },
-  cancelText: { color: colors.error, fontWeight: "600", fontSize: 13 },
-  downloadText: { color: colors.accent, fontWeight: "600", fontSize: 13 },
-  incomingBadge: {
-    backgroundColor: "#60a5fa",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: radius.pill,
-    marginLeft: 4,
-  },
-  incomingBadgeText: { fontSize: 10, fontWeight: "700", color: "#fff" },
-  approveBtn: {
+  awaitingActions: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.sm,
-    backgroundColor: "rgba(52,211,153,0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(52,211,153,0.2)",
+    gap: 10,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: colors.glassBorder,
   },
-  approveText: { fontSize: 12, fontWeight: "600", color: colors.success },
   rejectBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    flex: 1,
+    paddingVertical: 8,
     borderRadius: radius.sm,
-    backgroundColor: "rgba(248,113,113,0.08)",
+    backgroundColor: colors.errorDim,
     borderWidth: 1,
-    borderColor: "rgba(248,113,113,0.15)",
+    borderColor: "rgba(248,113,113,0.2)",
+    alignItems: "center",
   },
-  rejectText: { fontSize: 12, fontWeight: "600", color: colors.error },
+  rejectText: { color: colors.error, fontSize: 13, fontWeight: "600" },
+  approveBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accentDim,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    alignItems: "center",
+  },
+  approveText: { color: colors.accent, fontSize: 13, fontWeight: "600" },
+  cancelRow: {
+    marginTop: 10,
+    alignItems: "flex-end",
+  },
+  cancelText: { color: colors.error, fontSize: 12, fontWeight: "500" },
   emptyWrap: { alignItems: "center", marginTop: 60, gap: 12 },
   empty: { color: colors.textMuted, fontSize: 14 },
 });
