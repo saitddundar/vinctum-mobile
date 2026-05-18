@@ -1,10 +1,16 @@
-import { View, Text, StyleSheet, ScrollView, Pressable, RefreshControl } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  Pressable,
+  RefreshControl,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuthStore } from "../../src/store/auth";
 import { useDevices } from "../../src/features/devices/hooks/useDevices";
-import { DeviceType } from "../../src/features/devices/types";
 import { useSessions } from "../../src/features/sessions/hooks/useSessions";
 import { useNodeTransfers } from "../../src/features/transfer/hooks/useTransfers";
 import { getStoredDeviceId } from "../../src/lib/device";
@@ -12,21 +18,57 @@ import { TransferStatus } from "../../src/features/transfer/types";
 import { colors, spacing, radius } from "../../src/lib/theme";
 import { useState, useEffect, useCallback } from "react";
 
-function StatCard({ icon, label, value, color, onPress }: {
-  icon: string;
+function formatSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024)
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function StatCard({
+  label,
+  value,
+  color,
+}: {
   label: string;
   value: string | number;
   color: string;
-  onPress?: () => void;
 }) {
   return (
-    <Pressable style={styles.statCard} onPress={onPress}>
-      <View style={[styles.statIcon, { backgroundColor: color + "18" }]}>
-        <Ionicons name={icon as any} size={20} color={color} />
-      </View>
-      <Text style={styles.statValue}>{value}</Text>
+    <View style={styles.statCard}>
       <Text style={styles.statLabel}>{label}</Text>
-    </Pressable>
+      <Text style={[styles.statValue, { color }]}>{value}</Text>
+    </View>
+  );
+}
+
+function TransferRow({
+  name,
+  speed,
+  percent,
+}: {
+  name: string;
+  speed: string;
+  percent: number;
+}) {
+  return (
+    <View style={styles.transferRow}>
+      <View style={styles.transferMeta}>
+        <Text style={styles.transferName} numberOfLines={1}>
+          {name}
+        </Text>
+        <Text style={styles.transferSpeed}>{speed}</Text>
+      </View>
+      <View style={styles.transferRight}>
+        <Text style={styles.transferPercent}>{percent}%</Text>
+      </View>
+      <View style={styles.progressTrack}>
+        <View
+          style={[styles.progressFill, { width: `${percent}%` as any }]}
+        />
+      </View>
+    </View>
   );
 }
 
@@ -34,10 +76,20 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuthStore();
-  const { data: devices, isLoading: devicesLoading, refetch: refetchDevices } = useDevices();
-  const { data: sessions, isLoading: sessionsLoading, refetch: refetchSessions } = useSessions();
+  const {
+    data: devices,
+    isLoading: devicesLoading,
+    refetch: refetchDevices,
+  } = useDevices();
+  const {
+    data: sessions,
+    isLoading: sessionsLoading,
+    refetch: refetchSessions,
+  } = useSessions();
   const [nodeId, setNodeId] = useState<string | null>(null);
-  const { data: transfers, refetch: refetchTransfers } = useNodeTransfers(nodeId || "");
+  const { data: transfers, refetch: refetchTransfers } = useNodeTransfers(
+    nodeId || ""
+  );
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -46,113 +98,171 @@ export default function HomeScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([refetchDevices(), refetchSessions(), refetchTransfers()]);
+    await Promise.all([
+      refetchDevices(),
+      refetchSessions(),
+      refetchTransfers(),
+    ]);
     setRefreshing(false);
   }, []);
 
   const approvedDevices = devices?.filter((d) => d.is_approved) || [];
-  const pendingDevices = devices?.filter((d) => !d.is_approved && !d.is_revoked) || [];
+  const pendingDevices =
+    devices?.filter((d) => !d.is_approved && !d.is_revoked) || [];
   const activeSessions = sessions?.filter((s) => s.is_active) || [];
-  const activeTransfers = transfers?.filter(
-    (t) => t.status === TransferStatus.PENDING || t.status === TransferStatus.IN_PROGRESS
-  ) || [];
-  const completedTransfers = transfers?.filter((t) => t.status === TransferStatus.COMPLETED) || [];
+  const activeTransfers =
+    transfers?.filter(
+      (t) =>
+        t.status === TransferStatus.PENDING ||
+        t.status === TransferStatus.IN_PROGRESS
+    ) || [];
+  const completedTransfers =
+    transfers?.filter((t) => t.status === TransferStatus.COMPLETED) || [];
+
+  const totalDataBytes = completedTransfers.reduce(
+    (acc, t) => acc + t.total_size_bytes,
+    0
+  );
+
+  const quickActions = [
+    {
+      icon: "paper-plane-outline" as const,
+      label: "Send",
+      color: colors.accent,
+      route: "/(tabs)/transfers" as const,
+    },
+    {
+      icon: "shield-outline" as const,
+      label: "Pair",
+      color: colors.accent,
+      route: "/(tabs)/pairing" as const,
+    },
+    {
+      icon: "pulse-outline" as const,
+      label: "Health",
+      color: colors.warning,
+      route: "/(tabs)/network" as const,
+    },
+    {
+      icon: "people-outline" as const,
+      label: "Sessions",
+      color: colors.orange,
+      route: "/(tabs)/sessions" as const,
+    },
+  ];
 
   return (
     <ScrollView
       style={[styles.container, { paddingTop: insets.top }]}
       contentContainerStyle={styles.content}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.accent}
+        />
+      }
     >
-      <View style={styles.greeting}>
+      {/* Header */}
+      <View style={styles.pageHeader}>
         <View>
-          <Text style={styles.hello}>Welcome back</Text>
-          <Text style={styles.username}>{user?.username || "—"}</Text>
+          <Text style={styles.pageTitle}>Dashboard</Text>
+          <Text style={styles.pageSub}>
+            {approvedDevices.length} devices · {activeTransfers.length} active
+            transfers
+          </Text>
         </View>
-        <Pressable style={styles.avatarCircle} onPress={() => router.push("/(tabs)/profile")}>
-          <Text style={styles.avatarText}>{user?.username?.[0]?.toUpperCase() || "V"}</Text>
+        <Pressable
+          style={styles.avatarCircle}
+          onPress={() => router.push("/(tabs)/profile")}
+        >
+          <Text style={styles.avatarText}>
+            {user?.username?.[0]?.toUpperCase() || "V"}
+          </Text>
         </Pressable>
       </View>
 
+      {/* Stats Grid */}
       <View style={styles.statsGrid}>
         <StatCard
-          icon="phone-portrait"
-          label="Devices"
-          value={approvedDevices.length}
-          color={colors.accent}
-          onPress={() => router.push("/(tabs)/devices")}
-        />
-        <StatCard
-          icon="time"
-          label="Pending"
-          value={pendingDevices.length}
-          color={colors.warning}
-          onPress={() => router.push("/(tabs)/devices")}
-        />
-        <StatCard
-          icon="people"
-          label="Sessions"
-          value={activeSessions.length}
-          color={colors.success}
-          onPress={() => router.push("/(tabs)/sessions")}
-        />
-        <StatCard
-          icon="swap-horizontal"
-          label="Active"
+          label="ACTIVE"
           value={activeTransfers.length}
-          color="#60a5fa"
-          onPress={() => router.push("/(tabs)/transfers")}
+          color={colors.accent}
         />
+        <StatCard
+          label="WEEK"
+          value={completedTransfers.length + activeTransfers.length}
+          color={colors.blue}
+        />
+        <StatCard
+          label="DATA"
+          value={formatSize(totalDataBytes)}
+          color={colors.purple}
+        />
+        <StatCard label="SPEED" value="18 MB/s" color={colors.warning} />
       </View>
 
+      {/* Live Transfers */}
       {activeTransfers.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Active Transfers</Text>
-            <Pressable onPress={() => router.push("/(tabs)/transfers")}>
-              <Text style={styles.seeAll}>See all</Text>
-            </Pressable>
+            <Text style={styles.sectionTitle}>Live transfers</Text>
+            <View style={styles.liveBadge}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
           </View>
           {activeTransfers.slice(0, 3).map((t) => (
-            <View key={t.transfer_id} style={styles.transferItem}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.transferName} numberOfLines={1}>{t.filename}</Text>
-                <Text style={styles.transferMeta}>
-                  {(t.total_size_bytes / 1024).toFixed(0)} KB
-                </Text>
-              </View>
-              <View style={styles.transferRight}>
-                <View style={styles.miniProgress}>
-                  <View style={[styles.miniProgressFill, { width: `${t.progress_percent}%` }]} />
-                </View>
-                <Text style={styles.transferPercent}>{t.progress_percent}%</Text>
-              </View>
-            </View>
+            <TransferRow
+              key={t.transfer_id}
+              name={t.filename}
+              speed={`${((t.total_size_bytes / (1024 * 1024)) * 0.02).toFixed(0)} MB/s`}
+              percent={t.progress_percent}
+            />
           ))}
         </View>
       )}
 
+      {/* Quick Actions */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Quick actions</Text>
+        <View style={styles.actionsGrid}>
+          {quickActions.map((a) => (
+            <Pressable
+              key={a.label}
+              style={styles.actionCard}
+              onPress={() => router.push(a.route as any)}
+            >
+              <Ionicons name={a.icon} size={22} color={a.color} />
+              <Text style={styles.actionLabel}>{a.label}</Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
+
+      {/* Devices Summary */}
       {approvedDevices.length > 0 && (
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Devices</Text>
+            <Text style={styles.sectionTitle}>Your devices</Text>
             <Pressable onPress={() => router.push("/(tabs)/devices")}>
               <Text style={styles.seeAll}>See all</Text>
             </Pressable>
           </View>
-          {approvedDevices.slice(0, 4).map((d) => (
-            <View key={d.device_id} style={styles.deviceItem}>
+          {approvedDevices.slice(0, 3).map((d) => (
+            <View key={d.device_id} style={styles.deviceRow}>
               <View style={styles.deviceIcon}>
                 <Ionicons
-                  name={d.device_type === DeviceType.PHONE ? "phone-portrait" : d.device_type === DeviceType.TABLET ? "tablet-portrait" : "desktop"}
-                  size={16}
+                  name="desktop-outline"
+                  size={15}
                   color={colors.textSecondary}
                 />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.deviceName}>{d.name}</Text>
-                <Text style={styles.deviceMeta}>
-                  {d.last_active ? new Date(d.last_active).toLocaleDateString() : "Never active"}
+                <Text style={styles.deviceMeta} numberOfLines={1}>
+                  {d.node_id?.slice(0, 12) || "—"}
                 </Text>
               </View>
               <View style={styles.onlineDot} />
@@ -160,78 +270,45 @@ export default function HomeScreen() {
           ))}
         </View>
       )}
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-        </View>
-        <View style={styles.actionsRow}>
-          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/pairing")}>
-            <Ionicons name="qr-code" size={20} color={colors.accent} />
-            <Text style={styles.actionLabel}>Pair Device</Text>
-          </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/transfers")}>
-            <Ionicons name="cloud-upload" size={20} color={colors.success} />
-            <Text style={styles.actionLabel}>Send File</Text>
-          </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/sessions")}>
-            <Ionicons name="add-circle" size={20} color="#60a5fa" />
-            <Text style={styles.actionLabel}>New Session</Text>
-          </Pressable>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Manage</Text>
-        </View>
-        <View style={styles.actionsRow}>
-          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/friends")}>
-            <Ionicons name="people" size={20} color={colors.accent} />
-            <Text style={styles.actionLabel}>Friends</Text>
-          </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/network")}>
-            <Ionicons name="pulse" size={20} color={colors.warning} />
-            <Text style={styles.actionLabel}>Network</Text>
-          </Pressable>
-          <Pressable style={styles.actionCard} onPress={() => router.push("/(tabs)/devices")}>
-            <Ionicons name="phone-portrait" size={20} color={colors.success} />
-            <Text style={styles.actionLabel}>Devices</Text>
-          </Pressable>
-        </View>
-      </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: spacing.md, paddingBottom: 120 },
-  greeting: {
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: { paddingHorizontal: spacing.md, paddingBottom: 120 },
+
+  pageHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-start",
+    marginTop: spacing.md,
     marginBottom: spacing.lg,
-    marginTop: spacing.sm,
   },
-  hello: { fontSize: 14, color: colors.textSecondary },
-  username: { fontSize: 24, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
+  pageSub: { fontSize: 13, color: colors.textSecondary, marginTop: 3 },
   avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: colors.accentDim,
     borderWidth: 1,
-    borderColor: colors.accent,
+    borderColor: colors.accentBorder,
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { fontSize: 18, fontWeight: "700", color: colors.accent },
+  avatarText: { fontSize: 16, fontWeight: "700", color: colors.accent },
+
   statsGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   statCard: {
     flex: 1,
@@ -242,16 +319,15 @@ const styles = StyleSheet.create({
     borderColor: colors.glassBorder,
     padding: 14,
   },
-  statIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 10,
+  statLabel: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textMuted,
+    letterSpacing: 0.8,
+    marginBottom: 8,
   },
-  statValue: { fontSize: 22, fontWeight: "800", color: colors.text },
-  statLabel: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  statValue: { fontSize: 26, fontWeight: "800", letterSpacing: -0.5 },
+
   section: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -264,35 +340,91 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 14,
   },
-  sectionTitle: { fontSize: 16, fontWeight: "700", color: colors.text },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+    letterSpacing: -0.2,
+  },
   seeAll: { fontSize: 13, color: colors.accent, fontWeight: "500" },
-  transferItem: {
+  liveBadge: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorder,
+    gap: 5,
   },
-  transferName: { fontSize: 14, fontWeight: "500", color: colors.text },
-  transferMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-  transferRight: { alignItems: "flex-end", marginLeft: 12 },
-  miniProgress: {
-    width: 60,
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.accent,
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.accent,
+    letterSpacing: 0.5,
+  },
+
+  transferRow: { marginBottom: 14 },
+  transferMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  transferName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.text,
+    flex: 1,
+    marginRight: 8,
+  },
+  transferSpeed: { fontSize: 12, color: colors.textSecondary },
+  transferRight: { position: "absolute", right: 0, top: 0 },
+  transferPercent: { fontSize: 12, color: colors.accent, fontWeight: "600" },
+  progressTrack: {
     height: 3,
     backgroundColor: colors.inputBg,
     borderRadius: 2,
     overflow: "hidden",
   },
-  miniProgressFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 2 },
-  transferPercent: { fontSize: 11, color: colors.textSecondary, marginTop: 3 },
-  deviceItem: {
+  progressFill: {
+    height: "100%",
+    backgroundColor: colors.accent,
+    borderRadius: 2,
+  },
+
+  actionsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 12,
+  },
+  actionCard: {
+    flex: 1,
+    minWidth: "45%",
+    backgroundColor: colors.inputBg,
+    borderRadius: radius.md,
+    paddingVertical: 16,
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  actionLabel: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: "500",
+  },
+
+  deviceRow: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.glassBorder,
+    borderTopWidth: 1,
+    borderTopColor: colors.glassBorder,
   },
   deviceIcon: {
     width: 32,
@@ -303,22 +435,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 12,
   },
-  deviceName: { fontSize: 14, fontWeight: "500", color: colors.text },
-  deviceMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
+  deviceName: { fontSize: 13, fontWeight: "600", color: colors.text },
+  deviceMeta: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 2,
+    fontFamily: "monospace" as any,
+  },
   onlineDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: colors.success,
   },
-  actionsRow: { flexDirection: "row", gap: 10 },
-  actionCard: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 16,
-    backgroundColor: colors.inputBg,
-    borderRadius: radius.md,
-    gap: 6,
-  },
-  actionLabel: { fontSize: 12, color: colors.textSecondary, fontWeight: "500" },
 });
