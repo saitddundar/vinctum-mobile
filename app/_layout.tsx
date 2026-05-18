@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuthStore } from "../src/store/auth";
 import { Toast } from "../src/components/Toast";
+import { OfflineBanner } from "../src/components/OfflineBanner";
 import { colors } from "../src/lib/theme";
 
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <StatusBar style="light" />
+        <OfflineBanner />
         <AuthGate />
         <Toast />
       </QueryClientProvider>
