@@ -3,7 +3,8 @@ import { View, Text, Pressable, FlatList, StyleSheet, ActivityIndicator } from "
 import { Ionicons } from "@expo/vector-icons";
 import { useFriends, useFriendDevices } from "../features/friends/hooks/useFriends";
 import { useDeviceKey } from "../features/devices/hooks/useDeviceKeys";
-import type { Device, DeviceType } from "../features/devices/types";
+import { DeviceType } from "../features/devices/types";
+import type { Device } from "../features/devices/types";
 import type { Friend } from "../features/friends/types";
 import { colors, spacing, radius } from "../lib/theme";
 
