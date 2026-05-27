@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../api/client";
 import type { Friend, UserInfo, NotificationCount } from "../types";
+import type { Device } from "../../devices/types";
 
 export function useFriends() {
   return useQuery({
@@ -88,6 +89,19 @@ export function useNotificationCount() {
       return data;
     },
     refetchInterval: 30000,
+  });
+}
+
+export function useFriendDevices(userId: string | null) {
+  return useQuery({
+    queryKey: ["friend-devices", userId],
+    queryFn: async () => {
+      const { data } = await api.get<{ devices: Device[] }>(
+        `/api/v1/friends/${userId}/devices`
+      );
+      return data.devices || [];
+    },
+    enabled: !!userId,
   });
 }
 

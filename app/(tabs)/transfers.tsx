@@ -13,6 +13,8 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   useNodeTransfers,
   useCancelTransfer,
+  usePauseTransfer,
+  useResumeTransfer,
 } from "../../src/features/transfer/hooks/useTransfers";
 import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { useUpload } from "../../src/features/transfer/hooks/useUpload";
@@ -27,6 +29,7 @@ import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
 import DevicePicker from "../../src/components/DevicePicker";
 import SessionPicker from "../../src/components/SessionPicker";
+import FriendDevicePicker from "../../src/components/FriendDevicePicker";
 import {
   IncomingTransferBanner,
   useIncomingTransfers,
@@ -35,6 +38,7 @@ import {
 const statusColor: Record<string, string> = {
   [TransferStatus.PENDING]: colors.warning,
   [TransferStatus.IN_PROGRESS]: colors.accent,
+  [TransferStatus.PAUSED]: colors.warning,
   [TransferStatus.COMPLETED]: colors.success,
   [TransferStatus.CANCELLED]: colors.textMuted,
   [TransferStatus.FAILED]: colors.error,
@@ -56,7 +60,7 @@ export default function TransfersScreen() {
   const router = useRouter();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const [showSend, setShowSend] = useState(false);
-  const [sendMode, setSendMode] = useState<"device" | "session">("device");
+  const [sendMode, setSendMode] = useState<"device" | "session" | "friend">("device");
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
   const { data: transfers, isLoading, refetch } = useNodeTransfers(nodeId || "");
@@ -64,6 +68,8 @@ export default function TransfersScreen() {
   const sessionTransferHook = useSessionTransfer();
   const downloadHook = useDownload();
   const cancel = useCancelTransfer();
+  const pause = usePauseTransfer();
+  const resume = useResumeTransfer();
   const respondTransfer = useRespondToTransfer();
 
   const handleDownload = useCallback(
@@ -118,7 +124,8 @@ export default function TransfersScreen() {
     if (filter === "active")
       return (
         t.status === TransferStatus.PENDING ||
-        t.status === TransferStatus.IN_PROGRESS
+        t.status === TransferStatus.IN_PROGRESS ||
+        t.status === TransferStatus.PAUSED
       );
     if (filter === "done") return t.status === TransferStatus.COMPLETED;
     return true;
@@ -127,7 +134,8 @@ export default function TransfersScreen() {
   const activeCount = (transfers || []).filter(
     (t) =>
       t.status === TransferStatus.PENDING ||
-      t.status === TransferStatus.IN_PROGRESS
+      t.status === TransferStatus.IN_PROGRESS ||
+      t.status === TransferStatus.PAUSED
   ).length;
 
   const handleDeviceSelect = async (device: Device, pubKey: string) => {
@@ -164,6 +172,18 @@ export default function TransfersScreen() {
     }
   };
 
+  const handleFriendSelect = async (device: Device, pubKey: string) => {
+    try {
+      const tid = await uploadHook.upload(device.node_id, pubKey);
+      if (tid) {
+        toast.success("Transfer started");
+        setShowSend(false);
+      }
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Send failed");
+    }
+  };
+
   const handleCancel = (t: Transfer) => {
     Alert.alert("Cancel Transfer", `Cancel "${t.filename}"?`, [
       { text: "Keep" },
@@ -181,6 +201,20 @@ export default function TransfersScreen() {
           ),
       },
     ]);
+  };
+
+  const handlePause = (t: Transfer) => {
+    pause.mutate(t.transfer_id, {
+      onSuccess: () => toast.success("Transfer paused"),
+      onError: (e: any) => toast.error(e?.response?.data?.error || "Pause failed"),
+    });
+  };
+
+  const handleResume = (t: Transfer) => {
+    resume.mutate(t.transfer_id, {
+      onSuccess: () => toast.success("Transfer resumed"),
+      onError: (e: any) => toast.error(e?.response?.data?.error || "Resume failed"),
+    });
   };
 
   const isDownloading = (id: string) =>
@@ -273,6 +307,22 @@ export default function TransfersScreen() {
                   Session
                 </Text>
               </Pressable>
+              <Pressable
+                style={[
+                  styles.sendModeBtn,
+                  sendMode === "friend" && styles.sendModeBtnActive,
+                ]}
+                onPress={() => setSendMode("friend")}
+              >
+                <Text
+                  style={[
+                    styles.sendModeText,
+                    sendMode === "friend" && styles.sendModeTextActive,
+                  ]}
+                >
+                  Friend
+                </Text>
+              </Pressable>
             </View>
             {sendMode === "device" ? (
               <DevicePicker
@@ -280,10 +330,15 @@ export default function TransfersScreen() {
                 onSelect={handleDeviceSelect}
                 onCancel={() => setShowSend(false)}
               />
-            ) : (
+            ) : sendMode === "session" ? (
               <SessionPicker
                 currentDeviceId={nodeId}
                 onSelect={handleSessionSelect}
+                onCancel={() => setShowSend(false)}
+              />
+            ) : (
+              <FriendDevicePicker
+                onSelect={handleFriendSelect}
                 onCancel={() => setShowSend(false)}
               />
             )}
@@ -294,6 +349,8 @@ export default function TransfersScreen() {
         transfers={incoming}
         onDownload={handleDownload}
         onDismiss={dismiss}
+        onAccept={(t) => handleRespond(t, true)}
+        onReject={(t) => handleRespond(t, false)}
       />
 
       {/* Filters */}
@@ -324,14 +381,18 @@ export default function TransfersScreen() {
           const downloading = isDownloading(item.transfer_id);
           const canCancel =
             item.status === TransferStatus.PENDING ||
-            item.status === TransferStatus.IN_PROGRESS;
+            item.status === TransferStatus.IN_PROGRESS ||
+            item.status === TransferStatus.PAUSED;
+          const canPause = item.status === TransferStatus.IN_PROGRESS;
+          const canResume = item.status === TransferStatus.PAUSED;
           const canDownload =
             item.status === TransferStatus.COMPLETED &&
             item.receiver_node_id === nodeId;
           const col = statusColor[item.status] || colors.accent;
           const isActive =
             item.status === TransferStatus.IN_PROGRESS ||
-            item.status === TransferStatus.PENDING;
+            item.status === TransferStatus.PENDING ||
+            item.status === TransferStatus.PAUSED;
 
           return (
             <Pressable
@@ -345,6 +406,8 @@ export default function TransfersScreen() {
                     name={
                       item.status === TransferStatus.COMPLETED
                         ? "checkmark"
+                        : item.status === TransferStatus.PAUSED
+                        ? "pause"
                         : item.status === TransferStatus.IN_PROGRESS ||
                           item.status === TransferStatus.PENDING
                         ? "paper-plane-outline"
@@ -421,6 +484,26 @@ export default function TransfersScreen() {
                 </View>
               )}
 
+              {(canPause || canResume || canCancel) && (
+                <View style={styles.transferActions}>
+                  {canPause && (
+                    <Pressable style={styles.pauseBtn} onPress={() => handlePause(item)}>
+                      <Text style={styles.pauseText}>Pause</Text>
+                    </Pressable>
+                  )}
+                  {canResume && (
+                    <Pressable style={styles.resumeBtn} onPress={() => handleResume(item)}>
+                      <Text style={styles.resumeText}>Resume</Text>
+                    </Pressable>
+                  )}
+                  {canCancel && (
+                    <Pressable style={styles.cancelBtn} onPress={() => handleCancel(item)}>
+                      <Text style={styles.cancelText}>Cancel</Text>
+                    </Pressable>
+                  )}
+                </View>
+              )}
+
               {/* Awaiting approval actions */}
               {item.status === TransferStatus.AWAITING_APPROVAL &&
                 item.receiver_node_id === nodeId && (
@@ -440,15 +523,6 @@ export default function TransfersScreen() {
                   </View>
                 )}
 
-              {/* Cancel */}
-              {canCancel && (
-                <Pressable
-                  style={styles.cancelRow}
-                  onPress={() => handleCancel(item)}
-                >
-                  <Text style={styles.cancelText}>Cancel transfer</Text>
-                </Pressable>
-              )}
             </Pressable>
           );
         }}
@@ -615,11 +689,39 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   approveText: { color: colors.accent, fontSize: 13, fontWeight: "600" },
-  cancelRow: {
+  transferActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
     marginTop: 10,
-    alignItems: "flex-end",
   },
-  cancelText: { color: colors.error, fontSize: 12, fontWeight: "500" },
+  pauseBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  pauseText: { color: colors.warning, fontSize: 12, fontWeight: "600" },
+  resumeBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accentDim,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  resumeText: { color: colors.accent, fontSize: 12, fontWeight: "600" },
+  cancelBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    backgroundColor: colors.errorDim,
+    borderWidth: 1,
+    borderColor: "rgba(248,113,113,0.2)",
+  },
+  cancelText: { color: colors.error, fontSize: 12, fontWeight: "600" },
   emptyWrap: { alignItems: "center", marginTop: 60, gap: 12 },
   empty: { color: colors.textMuted, fontSize: 14 },
 });

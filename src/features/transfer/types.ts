@@ -1,6 +1,7 @@
 export enum TransferStatus {
   PENDING = "TRANSFER_STATUS_PENDING",
   IN_PROGRESS = "TRANSFER_STATUS_IN_PROGRESS",
+  PAUSED = "TRANSFER_STATUS_PAUSED",
   COMPLETED = "TRANSFER_STATUS_COMPLETED",
   CANCELLED = "TRANSFER_STATUS_CANCELLED",
   FAILED = "TRANSFER_STATUS_FAILED",
@@ -68,7 +69,13 @@ export interface InitiateGroupTransferResponse {
 }
 
 export interface TransferEvent {
-  type: "EVENT_TYPE_NEW" | "EVENT_TYPE_UPDATED" | "EVENT_TYPE_COMPLETED" | "EVENT_TYPE_CANCELLED";
+  type:
+    | "EVENT_TYPE_NEW"
+    | "EVENT_TYPE_UPDATED"
+    | "EVENT_TYPE_COMPLETED"
+    | "EVENT_TYPE_CANCELLED"
+    | "EVENT_TYPE_PAUSED"
+    | "EVENT_TYPE_RESUMED";
   transfer: Transfer;
   timestamp: string;
 }

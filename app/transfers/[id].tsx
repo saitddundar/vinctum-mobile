@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { View, Text, StyleSheet, ScrollView, Pressable } from "react-native";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useTransferDetail } from "../../src/features/transfer/hooks/useTransfers";
+import {
+  useTransferDetail,
+  usePauseTransfer,
+  useResumeTransfer,
+} from "../../src/features/transfer/hooks/useTransfers";
 import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
 import { TransferStatus } from "../../src/features/transfer/types";
 import { getStoredDeviceId } from "../../src/lib/device";
@@ -10,6 +14,7 @@ import { colors, radius, spacing } from "../../src/lib/theme";
 const statusLabel: Record<string, string> = {
   [TransferStatus.PENDING]: "Pending",
   [TransferStatus.IN_PROGRESS]: "In progress",
+  [TransferStatus.PAUSED]: "Paused",
   [TransferStatus.COMPLETED]: "Completed",
   [TransferStatus.CANCELLED]: "Cancelled",
   [TransferStatus.FAILED]: "Failed",
@@ -19,6 +24,7 @@ const statusLabel: Record<string, string> = {
 const statusColor: Record<string, string> = {
   [TransferStatus.PENDING]: colors.warning,
   [TransferStatus.IN_PROGRESS]: colors.accent,
+  [TransferStatus.PAUSED]: colors.warning,
   [TransferStatus.COMPLETED]: colors.success,
   [TransferStatus.CANCELLED]: colors.textMuted,
   [TransferStatus.FAILED]: colors.error,
@@ -45,6 +51,8 @@ export default function TransferDetailScreen() {
   const router = useRouter();
   const [nodeId, setNodeId] = useState<string | null>(null);
   const { data, isLoading, error } = useTransferDetail(id || "");
+  const pause = usePauseTransfer();
+  const resume = useResumeTransfer();
 
   useEffect(() => {
     getStoredDeviceId().then(setNodeId);
@@ -101,6 +109,28 @@ export default function TransferDetailScreen() {
                 {data.chunks_transferred} / {data.total_chunks} chunks ({stats.percent}%)
               </Text>
             </View>
+
+            {(data.status === TransferStatus.IN_PROGRESS ||
+              data.status === TransferStatus.PAUSED) && (
+              <View style={styles.actionRow}>
+                {data.status === TransferStatus.IN_PROGRESS && (
+                  <Pressable
+                    style={styles.pauseBtn}
+                    onPress={() => pause.mutate(data.transfer_id)}
+                  >
+                    <Text style={styles.pauseText}>Pause</Text>
+                  </Pressable>
+                )}
+                {data.status === TransferStatus.PAUSED && (
+                  <Pressable
+                    style={styles.resumeBtn}
+                    onPress={() => resume.mutate(data.transfer_id)}
+                  >
+                    <Text style={styles.resumeText}>Resume</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
 
             <View style={styles.card}>
               <Row label="Transferred" value={`${fmtBytes(data.bytes_transferred)} / ${fmtBytes(data.total_bytes)}`} />
@@ -160,6 +190,31 @@ const styles = StyleSheet.create({
   },
   progressFill: { height: "100%", borderRadius: 3 },
   muted: { fontSize: 13, color: colors.textSecondary },
+  actionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: spacing.md,
+  },
+  pauseBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    alignItems: "center",
+  },
+  pauseText: { color: colors.warning, fontWeight: "700" },
+  resumeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.md,
+    backgroundColor: colors.accentDim,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+    alignItems: "center",
+  },
+  resumeText: { color: colors.accent, fontWeight: "700" },
   row: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 6, gap: spacing.md },
   rowLabel: { color: colors.textSecondary, fontSize: 13 },
   rowValue: { color: colors.text, fontSize: 13, flexShrink: 1, textAlign: "right" },

@@ -44,3 +44,35 @@ export function useCancelTransfer() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transfers"] }),
   });
 }
+
+export function usePauseTransfer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (transferId: string) => {
+      const { data } = await api.post<{ transfer_id: string; status: string }>(
+        `/api/v1/transfers/${transferId}/pause`
+      );
+      return data;
+    },
+    onSuccess: (_, transferId) => {
+      qc.invalidateQueries({ queryKey: ["transfers"] });
+      qc.invalidateQueries({ queryKey: ["transfer", transferId] });
+    },
+  });
+}
+
+export function useResumeTransfer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (transferId: string) => {
+      const { data } = await api.post<{ transfer_id: string; status: string }>(
+        `/api/v1/transfers/${transferId}/resume`
+      );
+      return data;
+    },
+    onSuccess: (_, transferId) => {
+      qc.invalidateQueries({ queryKey: ["transfers"] });
+      qc.invalidateQueries({ queryKey: ["transfer", transferId] });
+    },
+  });
+}

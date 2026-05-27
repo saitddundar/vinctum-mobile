@@ -1,7 +1,8 @@
 import { useState, useCallback } from "react";
-import { View, Text, Pressable, StyleSheet, Animated } from "react-native";
+import { View, Text, Pressable, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { Transfer, TransferEvent } from "../features/transfer/types";
+import { Transfer, TransferEvent, TransferStatus } from "../features/transfer/types";
+import { showLocalNotification } from "../lib/notifications";
 import { colors, spacing, radius } from "../lib/theme";
 
 function formatSize(bytes: number) {
@@ -13,6 +14,8 @@ function formatSize(bytes: number) {
 interface Props {
   onDownload: (transfer: Transfer) => void;
   onDismiss: (transferId: string) => void;
+  onAccept?: (transfer: Transfer) => void;
+  onReject?: (transfer: Transfer) => void;
 }
 
 export function useIncomingTransfers(currentNodeId: string | null, props: Props) {
@@ -29,6 +32,9 @@ export function useIncomingTransfers(currentNodeId: string | null, props: Props)
       ) {
         setIncoming((prev) => {
           if (prev.some((t) => t.transfer_id === event.transfer.transfer_id)) return prev;
+          showLocalNotification("Incoming transfer", event.transfer.filename, {
+            route: "/(tabs)/transfers",
+          });
           return [event.transfer, ...prev];
         });
       }
@@ -56,10 +62,14 @@ export function IncomingTransferBanner({
   transfers,
   onDownload,
   onDismiss,
+  onAccept,
+  onReject,
 }: {
   transfers: Transfer[];
   onDownload: (t: Transfer) => void;
   onDismiss: (id: string) => void;
+  onAccept?: (t: Transfer) => void;
+  onReject?: (t: Transfer) => void;
 }) {
   if (transfers.length === 0) return null;
 
@@ -76,9 +86,20 @@ export function IncomingTransferBanner({
             </Text>
             <Text style={styles.meta}>{formatSize(t.total_size_bytes)}</Text>
           </View>
-          <Pressable style={styles.downloadBtn} onPress={() => onDownload(t)}>
-            <Text style={styles.downloadText}>Download</Text>
-          </Pressable>
+          {t.status === TransferStatus.AWAITING_APPROVAL ? (
+            <View style={styles.actionsRow}>
+              <Pressable style={styles.rejectBtn} onPress={() => onReject?.(t)}>
+                <Text style={styles.rejectText}>Reject</Text>
+              </Pressable>
+              <Pressable style={styles.approveBtn} onPress={() => onAccept?.(t)}>
+                <Text style={styles.approveText}>Accept</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Pressable style={styles.downloadBtn} onPress={() => onDownload(t)}>
+              <Text style={styles.downloadText}>Download</Text>
+            </Pressable>
+          )}
           <Pressable onPress={() => onDismiss(t.transfer_id)} hitSlop={8}>
             <Ionicons name="close" size={16} color={colors.textMuted} />
           </Pressable>
@@ -117,4 +138,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
   downloadText: { fontSize: 12, fontWeight: "600", color: "#fff" },
+  actionsRow: { flexDirection: "row", gap: 8 },
+  rejectBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    backgroundColor: colors.inputBg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+  },
+  rejectText: { fontSize: 12, fontWeight: "600", color: colors.textSecondary },
+  approveBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+    backgroundColor: colors.accent,
+  },
+  approveText: { fontSize: 12, fontWeight: "600", color: "#fff" },
 });
