@@ -11,6 +11,7 @@ export interface Device {
   device_type: DeviceType;
   node_id: string;
   fingerprint: string;
+  is_public?: boolean;
   is_approved: boolean;
   approved_at: string | null;
   approved_by_device_id: string | null;
@@ -24,6 +25,7 @@ export interface RegisterDeviceRequest {
   device_type: DeviceType;
   fingerprint: string;
   node_id: string;
+  is_public?: boolean;
 }
 
 export interface PairingGenerateRequest {

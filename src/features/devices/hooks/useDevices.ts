@@ -43,3 +43,17 @@ export function useRevokeDevice() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["devices"] }),
   });
 }
+
+export function useUpdateDeviceVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ deviceId, isPublic }: { deviceId: string; isPublic: boolean }) => {
+      const { data } = await api.put<{ success: boolean }>(
+        `/api/v1/devices/${deviceId}/visibility`,
+        { is_public: isPublic }
+      );
+      return data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["devices"] }),
+  });
+}

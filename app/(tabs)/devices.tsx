@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import {
   useDevices,
   useRevokeDevice,
+  useUpdateDeviceVisibility,
 } from "../../src/features/devices/hooks/useDevices";
 import { useApprovePairing } from "../../src/features/devices/hooks/usePairing";
 import { Device, DeviceType } from "../../src/features/devices/types";
@@ -83,14 +84,20 @@ function DeviceCard({
   device,
   isSelf,
   onRevoke,
+  onToggleVisibility,
+  updatingVisibility,
 }: {
   device: Device;
   isSelf: boolean;
   onRevoke: (id: string) => void;
+  onToggleVisibility: (id: string, next: boolean) => void;
+  updatingVisibility: boolean;
 }) {
   const shortKey = device.node_id
     ? device.node_id.slice(0, 10)
     : device.device_id.slice(0, 10);
+
+  const isPublic = !!device.is_public;
 
   return (
     <View style={styles.deviceCard}>
@@ -137,6 +144,30 @@ function DeviceCard({
         </Text>
       </View>
 
+      {device.is_approved && !device.is_revoked && (
+        <View style={styles.visibilityRow}>
+          <Text style={styles.visibilityLabel}>Visibility</Text>
+          <Pressable
+            style={[
+              styles.visibilityBtn,
+              isPublic ? styles.visibilityPublic : styles.visibilityPrivate,
+              updatingVisibility && styles.disabled,
+            ]}
+            onPress={() => onToggleVisibility(device.device_id, !isPublic)}
+            disabled={updatingVisibility}
+          >
+            <Text
+              style={[
+                styles.visibilityText,
+                isPublic ? styles.visibilityTextPublic : styles.visibilityTextPrivate,
+              ]}
+            >
+              {isPublic ? "Public" : "Private"}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       {!isSelf && device.is_approved && !device.is_revoked && (
         <Pressable
           style={styles.revokeRow}
@@ -156,6 +187,7 @@ export default function DevicesScreen() {
   const { data: devices, isLoading, refetch } = useDevices();
   const revoke = useRevokeDevice();
   const approve = useApprovePairing();
+  const visibility = useUpdateDeviceVisibility();
 
   useEffect(() => {
     getStoredDeviceId().then(setSelfDeviceId);
@@ -188,6 +220,18 @@ export default function DevicesScreen() {
           toast.success(doApprove ? "Device approved" : "Device rejected"),
         onError: (e: any) =>
           toast.error(e?.response?.data?.error || "Operation failed"),
+      }
+    );
+  };
+
+  const handleVisibilityToggle = (id: string, next: boolean) => {
+    visibility.mutate(
+      { deviceId: id, isPublic: next },
+      {
+        onSuccess: () =>
+          toast.success(next ? "Device set to public" : "Device set to private"),
+        onError: (e: any) =>
+          toast.error(e?.response?.data?.error || "Failed to update visibility"),
       }
     );
   };
@@ -241,6 +285,8 @@ export default function DevicesScreen() {
               device={item.device}
               isSelf={item.device.device_id === selfDeviceId}
               onRevoke={handleRevoke}
+              onToggleVisibility={handleVisibilityToggle}
+              updatingVisibility={visibility.isPending}
             />
           );
         }}
@@ -422,6 +468,31 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   revokeText: { color: colors.error, fontSize: 12, fontWeight: "500" },
+
+  visibilityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  visibilityLabel: { fontSize: 12, color: colors.textMuted },
+  visibilityBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  visibilityPublic: {
+    backgroundColor: colors.accentDim,
+    borderColor: colors.accentBorder,
+  },
+  visibilityPrivate: {
+    backgroundColor: colors.inputBg,
+    borderColor: colors.glassBorder,
+  },
+  visibilityText: { fontSize: 12, fontWeight: "700" },
+  visibilityTextPublic: { color: colors.accent },
+  visibilityTextPrivate: { color: colors.textSecondary },
 
   emptyWrap: { alignItems: "center", marginTop: 60, gap: 12 },
   empty: { color: colors.textMuted, fontSize: 14 },
