@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, FlatList, Pressable, TextInput, StyleSheet, Alert } from "react-native";
+import { View, Text, SectionList, Pressable, TextInput, StyleSheet, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useSessions, useCreateSession, useCloseSession, useJoinSession, useLeaveSession } from "../../src/features/sessions/hooks/useSessions";
@@ -45,21 +45,48 @@ export default function SessionsScreen() {
   const isInSession = (s: Session) => s.devices?.some((d) => d.device_id === deviceId);
   const activeSessions = sessions?.filter((s) => s.is_active) || [];
   const closedSessions = sessions?.filter((s) => !s.is_active) || [];
+  const totalSessions = activeSessions.length + closedSessions.length;
+  const sections = [
+    { title: "Active", data: activeSessions },
+    { title: "Closed", data: closedSessions },
+  ].filter((section) => section.data.length > 0);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <View style={styles.topRow}>
-        <Text style={styles.header}>Sessions</Text>
-        <Pressable style={styles.createToggle} onPress={() => setShowCreate(!showCreate)}>
-          <Ionicons name={showCreate ? "close" : "add"} size={20} color="#fff" />
-        </Pressable>
+      <View style={styles.hero}>
+        <View style={styles.topRow}>
+          <View>
+            <Text style={styles.header}>Sessions</Text>
+            <Text style={styles.subhead}>
+              {activeSessions.length} active · {totalSessions} total
+            </Text>
+          </View>
+          <Pressable style={styles.createToggle} onPress={() => setShowCreate(!showCreate)}>
+            <Ionicons name={showCreate ? "close" : "add"} size={20} color="#fff" />
+          </Pressable>
+        </View>
+
+        <View style={styles.kpis}>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>YOUR DEVICE</Text>
+            <Text style={styles.kpiValue}>{deviceId ? "Linked" : "Loading"}</Text>
+          </View>
+          <View style={styles.kpiCard}>
+            <Text style={styles.kpiLabel}>JOINED</Text>
+            <Text style={styles.kpiValue}>{activeSessions.filter(isInSession).length}</Text>
+          </View>
+        </View>
       </View>
 
       {showCreate && (
         <View style={styles.createSection}>
+          <View style={styles.createHeader}>
+            <Ionicons name="sparkles" size={16} color={colors.accent} />
+            <Text style={styles.createTitle}>Create a session</Text>
+          </View>
           <TextInput
             style={styles.input}
-            placeholder="Session name"
+            placeholder="Give it a name"
             placeholderTextColor={colors.textMuted}
             value={sessionName}
             onChangeText={setSessionName}
@@ -75,9 +102,15 @@ export default function SessionsScreen() {
         </View>
       )}
 
-      <FlatList
-        data={[...activeSessions, ...closedSessions]}
+      <SectionList
+        sections={sections}
         keyExtractor={(s) => s.session_id}
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <View style={styles.sectionRule} />
+          </View>
+        )}
         renderItem={({ item }) => {
           const inSess = isInSession(item);
           const deviceCount = item.devices?.length || 0;
@@ -92,6 +125,11 @@ export default function SessionsScreen() {
                     {deviceCount} device{deviceCount !== 1 ? "s" : ""} · {new Date(item.created_at).toLocaleDateString()}
                   </Text>
                 </View>
+                {inSess && (
+                  <View style={styles.inSessionPill}>
+                    <Text style={styles.inSessionText}>In</Text>
+                  </View>
+                )}
               </View>
 
               {deviceCount > 0 && (
@@ -141,6 +179,7 @@ export default function SessionsScreen() {
           <View style={styles.emptyWrap}>
             <Ionicons name="people-outline" size={40} color={colors.textMuted} />
             <Text style={styles.empty}>{isLoading ? "Loading..." : "No sessions yet"}</Text>
+            <Text style={styles.emptySub}>Create one to keep your devices in sync.</Text>
           </View>
         }
         onRefresh={refetch}
@@ -154,8 +193,17 @@ export default function SessionsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingHorizontal: spacing.md },
-  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.md, marginTop: spacing.sm },
+  hero: {
+    backgroundColor: colors.glass,
+    borderRadius: radius.xl,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  topRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   header: { fontSize: 28, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
+  subhead: { marginTop: 4, fontSize: 13, color: colors.textSecondary },
   createToggle: {
     width: 36,
     height: 36,
@@ -164,6 +212,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  kpis: { flexDirection: "row", gap: 10, marginTop: spacing.md },
+  kpiCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.glassBorder,
+    padding: spacing.sm,
+  },
+  kpiLabel: { fontSize: 10, letterSpacing: 1.4, color: colors.textMuted },
+  kpiValue: { fontSize: 15, fontWeight: "700", color: colors.text, marginTop: 6 },
   createSection: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
@@ -172,6 +231,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
+  createHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginBottom: 8 },
+  createTitle: { fontSize: 13, fontWeight: "700", color: colors.textSecondary },
   input: {
     backgroundColor: colors.inputBg,
     borderWidth: 1,
@@ -201,10 +262,22 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: 10,
   },
+  sectionHeader: { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 10, marginTop: spacing.sm },
+  sectionTitle: { fontSize: 12, letterSpacing: 1.2, color: colors.textMuted },
+  sectionRule: { flex: 1, height: 1, backgroundColor: colors.glassBorder },
   cardTop: { flexDirection: "row", alignItems: "center" },
   statusIndicator: { width: 8, height: 8, borderRadius: 4, marginRight: 12 },
   sessionName: { fontSize: 16, fontWeight: "600", color: colors.text },
   meta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  inSessionPill: {
+    backgroundColor: colors.accentDim,
+    borderRadius: radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.accentBorder,
+  },
+  inSessionText: { fontSize: 11, color: colors.accent, fontWeight: "600" },
   deviceChips: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 12 },
   chip: {
     flexDirection: "row",
@@ -222,6 +295,7 @@ const styles = StyleSheet.create({
   joinText: { color: colors.accent, fontWeight: "600", fontSize: 13 },
   leaveText: { color: colors.warning, fontWeight: "600", fontSize: 13 },
   closeText: { color: colors.error, fontWeight: "600", fontSize: 13 },
-  emptyWrap: { alignItems: "center", marginTop: 60, gap: 12 },
+  emptyWrap: { alignItems: "center", marginTop: 60, gap: 10 },
   empty: { color: colors.textMuted, fontSize: 14 },
+  emptySub: { color: colors.textSecondary, fontSize: 12 },
 });
