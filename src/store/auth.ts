@@ -49,7 +49,7 @@ export const useAuthStore = create<AuthState>((set) => ({
           name: getDeviceName(),
           device_type: getDeviceType(),
           fingerprint,
-          node_id: fingerprint.slice(0, 16),
+          node_id: fingerprint, // full 64-char hex as required by backend
         });
         await storeDeviceId(res.data.device.device_id);
       } catch (e: any) {
@@ -70,7 +70,15 @@ export const useAuthStore = create<AuthState>((set) => ({
     const accessToken = await SecureStore.getItemAsync("access_token");
     const refreshToken = await SecureStore.getItemAsync("refresh_token");
     if (accessToken) {
+      // restore token state immediately so interceptor can attach it
       set({ accessToken, refreshToken, isAuthenticated: true });
+      // then hydrate user object from server
+      try {
+        const { data } = await api.get("/api/v1/users/me");
+        set({ user: data.user ?? data });
+      } catch {
+        // token may be expired — interceptor will refresh on next real request
+      }
     }
   },
 }));

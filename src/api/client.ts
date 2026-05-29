@@ -77,6 +77,15 @@ api.interceptors.response.use(
       await SecureStore.setItemAsync("access_token", data.access_token);
       await SecureStore.setItemAsync("refresh_token", data.refresh_token);
 
+      // keep Zustand store in sync so components read fresh tokens
+      try {
+        const { useAuthStore } = await import("../store/auth");
+        useAuthStore.setState({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+        });
+      } catch {}
+
       processQueue(null, data.access_token);
       original.headers.Authorization = `Bearer ${data.access_token}`;
       return api(original);
