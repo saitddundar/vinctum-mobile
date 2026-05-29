@@ -1,6 +1,8 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../../api/client";
 import { Transfer, TransferDetail, InitiateTransferRequest } from "../types";
+
+const PAGE_SIZE = 30;
 
 export function useNodeTransfers(nodeId: string) {
   return useQuery({
@@ -12,6 +14,23 @@ export function useNodeTransfers(nodeId: string) {
     enabled: !!nodeId,
   });
 }
+
+export function useNodeTransfersPaginated(nodeId: string) {
+  return useInfiniteQuery({
+    queryKey: ["transfers-paged", nodeId],
+    queryFn: async ({ pageParam = 0 }) => {
+      const { data } = await api.get<{ transfers: Transfer[] }>(
+        `/api/v1/node-transfers/${nodeId}?limit=${PAGE_SIZE}&offset=${pageParam}`
+      );
+      return { transfers: data.transfers ?? [], nextOffset: pageParam + PAGE_SIZE };
+    },
+    initialPageParam: 0,
+    getNextPageParam: (last) =>
+      last.transfers.length === PAGE_SIZE ? last.nextOffset : undefined,
+    enabled: !!nodeId,
+  });
+}
+
 
 export function useTransferDetail(transferId: string) {
   return useQuery({

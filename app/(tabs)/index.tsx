@@ -17,6 +17,15 @@ import { getStoredDeviceId } from "../../src/lib/device";
 import { TransferStatus } from "../../src/features/transfer/types";
 import { colors, spacing, radius } from "../../src/lib/theme";
 import { useState, useEffect, useCallback } from "react";
+import { useTransferEvents } from "../../src/features/transfer/hooks/useTransferEvents";
+import {
+  IncomingTransferBanner,
+  useIncomingTransfers,
+} from "../../src/components/IncomingTransferBanner";
+import { useRespondToTransfer } from "../../src/features/friends/hooks/useFriends";
+import { useDownload } from "../../src/features/transfer/hooks/useDownload";
+import { toast } from "../../src/lib/toast";
+import type { Transfer } from "../../src/features/transfer/types";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -91,6 +100,41 @@ export default function HomeScreen() {
     nodeId || ""
   );
   const [refreshing, setRefreshing] = useState(false);
+  const downloadHook = useDownload();
+  const respondTransfer = useRespondToTransfer();
+  const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
+
+  const handleDownload = useCallback(
+    (t: Transfer) => {
+      setActiveDownloadId(t.transfer_id);
+      downloadHook
+        .download(t.transfer_id, t.sender_ephemeral_pubkey, t.filename, t.wrapped_file_key)
+        .then((path) => toast.success(`Saved: ${path.split("/").pop()}`))
+        .catch((e: any) => toast.error(e?.message || "Download failed"))
+        .finally(() => setActiveDownloadId(null));
+    },
+    [downloadHook]
+  );
+
+  const handleRespond = useCallback(
+    (transfer: Transfer, accept: boolean) => {
+      respondTransfer.mutate(
+        { transferId: transfer.transfer_id, receiverNodeId: transfer.receiver_node_id, accept },
+        {
+          onSuccess: () => toast.success(accept ? "Transfer accepted" : "Transfer rejected"),
+          onError: () => toast.error("Failed to respond"),
+        }
+      );
+    },
+    [respondTransfer]
+  );
+
+  const { incoming, handleEvent, dismiss } = useIncomingTransfers(nodeId, {
+    onDownload: handleDownload,
+    onDismiss: () => {},
+  });
+
+  useTransferEvents(nodeId, { onEvent: handleEvent });
 
   useEffect(() => {
     getStoredDeviceId().then(setNodeId);
@@ -164,6 +208,15 @@ export default function HomeScreen() {
         />
       }
     >
+      {/* Incoming transfer banner */}
+      <IncomingTransferBanner
+        transfers={incoming}
+        onDownload={handleDownload}
+        onDismiss={dismiss}
+        onAccept={(t) => handleRespond(t, true)}
+        onReject={(t) => handleRespond(t, false)}
+      />
+
       {/* Header */}
       <View style={styles.pageHeader}>
         <View>

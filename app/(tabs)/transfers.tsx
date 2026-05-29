@@ -11,7 +11,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  useNodeTransfers,
+  useNodeTransfersPaginated,
   useCancelTransfer,
   usePauseTransfer,
   useResumeTransfer,
@@ -63,7 +63,9 @@ export default function TransfersScreen() {
   const [sendMode, setSendMode] = useState<"device" | "session" | "friend">("device");
   const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null);
   const [filter, setFilter] = useState<FilterType>("all");
-  const { data: transfers, isLoading, refetch } = useNodeTransfers(nodeId || "");
+  const { data: transferPages, isLoading, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useNodeTransfersPaginated(nodeId || "");
+  const transfers = transferPages?.pages.flatMap((p) => p.transfers) ?? [];
   const uploadHook = useUpload();
   const sessionTransferHook = useSessionTransfer();
   const downloadHook = useDownload();
@@ -536,6 +538,15 @@ export default function TransfersScreen() {
         }
         onRefresh={refetch}
         refreshing={isLoading}
+        onEndReached={() => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); }}
+        onEndReachedThreshold={0.3}
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <View style={{ alignItems: "center", paddingVertical: 16 }}>
+              <Text style={{ color: colors.textMuted, fontSize: 12 }}>Loading more...</Text>
+            </View>
+          ) : null
+        }
         contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
       />
