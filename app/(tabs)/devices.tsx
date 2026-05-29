@@ -136,12 +136,10 @@ function DeviceCard({
         <Text style={styles.nodeId}>{shortKey}…</Text>
       </View>
 
-      {/* Stats */}
+      {/* Status */}
       <View style={styles.deviceStats}>
         <View style={styles.onlineDot} />
-        <Text style={styles.statText}>
-          ↑ 12.4 GB {"  "}↓ 3.1 GB
-        </Text>
+        <Text style={styles.statText}>Online</Text>
       </View>
 
       {device.is_approved && !device.is_revoked && (

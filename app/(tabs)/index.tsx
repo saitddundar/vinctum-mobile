@@ -200,7 +200,7 @@ export default function HomeScreen() {
           value={formatSize(totalDataBytes)}
           color={colors.purple}
         />
-        <StatCard label="SPEED" value="18 MB/s" color={colors.warning} />
+        <StatCard label="SPEED" value="—" color={colors.warning} />
       </View>
 
       {/* Live Transfers */}
@@ -217,7 +217,7 @@ export default function HomeScreen() {
             <TransferRow
               key={t.transfer_id}
               name={t.filename}
-              speed={`${((t.total_size_bytes / (1024 * 1024)) * 0.02).toFixed(0)} MB/s`}
+              speed={""}
               percent={t.progress_percent}
             />
           ))}

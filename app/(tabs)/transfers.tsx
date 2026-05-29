@@ -125,7 +125,8 @@ export default function TransfersScreen() {
       return (
         t.status === TransferStatus.PENDING ||
         t.status === TransferStatus.IN_PROGRESS ||
-        t.status === TransferStatus.PAUSED
+        t.status === TransferStatus.PAUSED ||
+        t.status === TransferStatus.AWAITING_APPROVAL
       );
     if (filter === "done") return t.status === TransferStatus.COMPLETED;
     return true;
@@ -135,7 +136,8 @@ export default function TransfersScreen() {
     (t) =>
       t.status === TransferStatus.PENDING ||
       t.status === TransferStatus.IN_PROGRESS ||
-      t.status === TransferStatus.PAUSED
+      t.status === TransferStatus.PAUSED ||
+      t.status === TransferStatus.AWAITING_APPROVAL
   ).length;
 
   const handleDeviceSelect = async (device: Device, pubKey: string) => {
@@ -425,12 +427,6 @@ export default function TransfersScreen() {
                   </Text>
                   <Text style={styles.meta}>
                     {formatSize(item.total_size_bytes)}
-                    {isActive && (
-                      <Text style={[styles.metaSpeed, { color: colors.accent }]}>
-                        {"  "}
-                        {((item.total_size_bytes / (1024 * 1024)) * 0.02).toFixed(0)} MB/s
-                      </Text>
-                    )}
                     {item.status === TransferStatus.COMPLETED && (
                       <Text style={styles.metaTime}>
                         {"  "}
