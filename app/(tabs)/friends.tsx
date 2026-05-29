@@ -275,7 +275,7 @@ export default function FriendsScreen() {
               <Text style={styles.cardName}>{item.user.username}</Text>
               <Text style={styles.cardHandle}>@{item.user.username}</Text>
             </View>
-            <Pressable style={styles.messageBtn} onPress={() => {}}>
+            <Pressable style={styles.messageBtn} onPress={() => toast.info("Messaging coming soon")}>
               <Text style={styles.messageBtnText}>Message</Text>
             </Pressable>
           </View>
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.success,
+    backgroundColor: colors.textMuted, // greyed — real online status not yet available from API
     borderWidth: 2,
     borderColor: colors.bg,
   },
