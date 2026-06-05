@@ -16,6 +16,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="transfers" options={{ title: "Transfers" }} />
       <Tabs.Screen name="friends" options={{ title: "Friends" }} />
       <Tabs.Screen name="network" options={{ title: "Network" }} />
+      <Tabs.Screen name="files" options={{ title: "Files" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
 
       {/* Hidden tabs (accessible via navigation, not shown in dock) */}

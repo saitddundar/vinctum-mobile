@@ -11,6 +11,7 @@ const DOCK_TABS = [
   { name: "transfers", icon: "swap-horizontal-outline", iconActive: "swap-horizontal", label: "Transfer" },
   { name: "friends", icon: "people-outline", iconActive: "people", label: "Friends" },
   { name: "network", icon: "pulse-outline", iconActive: "pulse", label: "Network" },
+  { name: "files", icon: "folder-outline", iconActive: "folder", label: "Files" },
   { name: "profile", icon: "person-outline", iconActive: "person", label: "Profile" },
 ] as const;
 
