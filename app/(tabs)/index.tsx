@@ -24,8 +24,13 @@ import {
 } from "../../src/components/IncomingTransferBanner";
 import { useRespondToTransfer } from "../../src/features/friends/hooks/useFriends";
 import { useDownload } from "../../src/features/transfer/hooks/useDownload";
+import {
+  useActivityHeatmap,
+  useTransferSpeed,
+} from "../../src/features/transfer/hooks/useTransferMetrics";
 import { toast } from "../../src/lib/toast";
 import type { Transfer } from "../../src/features/transfer/types";
+import ActivityHeatmap from "../../src/components/ActivityHeatmap";
 
 function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -33,6 +38,11 @@ function formatSize(bytes: number) {
   if (bytes < 1024 * 1024 * 1024)
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
+function formatSpeed(bytesPerSec?: number) {
+  if (!bytesPerSec) return "0 B/s";
+  return `${formatSize(bytesPerSec)}/s`;
 }
 
 function StatCard({
@@ -99,6 +109,9 @@ export default function HomeScreen() {
   const { data: transfers, refetch: refetchTransfers } = useNodeTransfers(
     nodeId || ""
   );
+  const { data: activityDays = [], refetch: refetchActivity } =
+    useActivityHeatmap(nodeId);
+  const { data: speed, refetch: refetchSpeed } = useTransferSpeed(nodeId);
   const [refreshing, setRefreshing] = useState(false);
   const downloadHook = useDownload();
   const respondTransfer = useRespondToTransfer();
@@ -146,9 +159,17 @@ export default function HomeScreen() {
       refetchDevices(),
       refetchSessions(),
       refetchTransfers(),
+      refetchActivity(),
+      refetchSpeed(),
     ]);
     setRefreshing(false);
-  }, []);
+  }, [
+    refetchDevices,
+    refetchSessions,
+    refetchTransfers,
+    refetchActivity,
+    refetchSpeed,
+  ]);
 
   const approvedDevices = devices?.filter((d) => d.is_approved) || [];
   const pendingDevices =
@@ -217,6 +238,8 @@ export default function HomeScreen() {
         onReject={(t) => handleRespond(t, false)}
       />
 
+      <ActivityHeatmap days={activityDays} />
+
       {/* Header */}
       <View style={styles.pageHeader}>
         <View>
@@ -253,7 +276,11 @@ export default function HomeScreen() {
           value={formatSize(totalDataBytes)}
           color={colors.purple}
         />
-        <StatCard label="SPEED" value="—" color={colors.warning} />
+        <StatCard
+          label="SPEED"
+          value={formatSpeed(speed?.bytes_per_sec)}
+          color={colors.warning}
+        />
       </View>
 
       {/* Live Transfers */}
