@@ -11,6 +11,7 @@ import { useNotificationListener, registerForPushNotifications } from "../src/li
 import { useBiometricStore } from "../src/store/biometric";
 import { LockScreen } from "../src/components/LockScreen";
 import { colors } from "../src/lib/theme";
+import { usePresenceHeartbeat } from "../src/features/friends/hooks/usePresence";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ function AuthGate() {
   const appState = useRef(AppState.currentState);
 
   useNotificationListener();
+  usePresenceHeartbeat(isAuthenticated);
 
   useEffect(() => {
     loadTokens().then(() => setReady(true));

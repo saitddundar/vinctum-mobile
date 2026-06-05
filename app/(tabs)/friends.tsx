@@ -20,6 +20,7 @@ import {
   useRespondToFriendRequest,
   useRemoveFriend,
 } from "../../src/features/friends/hooks/useFriends";
+import { usePresence } from "../../src/features/friends/hooks/usePresence";
 import type { Friend, UserInfo } from "../../src/features/friends/types";
 import { toast } from "../../src/lib/toast";
 import { colors, spacing, radius } from "../../src/lib/theme";
@@ -95,6 +96,8 @@ export default function FriendsScreen() {
   const sendRequest = useSendFriendRequest();
   const respond = useRespondToFriendRequest();
   const remove = useRemoveFriend();
+  const friendUserIds = friends.map((friend) => friend.user.user_id);
+  const { data: presence = new Map() } = usePresence(friendUserIds);
 
   const handleSearch = useCallback(() => {
     if (!query.trim()) return;
@@ -269,7 +272,12 @@ export default function FriendsScreen() {
               color={getColor(item.user.username)}
             />
             <View style={styles.friendOnlineDotWrap}>
-              <View style={styles.friendOnlineDot} />
+              <View
+                style={[
+                  styles.friendOnlineDot,
+                  presence.get(item.user.user_id)?.online && styles.friendOnlineDotActive,
+                ]}
+              />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.cardName}>{item.user.username}</Text>
@@ -381,9 +389,12 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.textMuted, // greyed — real online status not yet available from API
+    backgroundColor: colors.textMuted,
     borderWidth: 2,
     borderColor: colors.bg,
+  },
+  friendOnlineDotActive: {
+    backgroundColor: colors.success,
   },
   cardName: { fontSize: 14, fontWeight: "600", color: colors.text },
   cardHandle: { fontSize: 12, color: colors.textSecondary, marginTop: 1 },
